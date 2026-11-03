@@ -459,10 +459,27 @@ def main() -> None:
             rows[name]["val"] = evaluate_policy(bs_fn, S_val, s0, k, r, dt, m, kv, ALPHA)
 
     # ------------------------------------------------------------------
-    # 5. Figures
+    # 4b. Dump per-path TEST losses L = -V_T for paired bootstrap analysis
     # ------------------------------------------------------------------
     out_dir = ROOT / "results" / "approach2" / "if"
     out_dir.mkdir(parents=True, exist_ok=True)
+    dump = {}
+    for kv, label in kappas:
+        with torch.no_grad():
+            V, _, _ = hedge_pnl(S_test, neural_delta(model, S_test, s0, m), k, r, dt, m, kv)
+        dump[f"neural_{label}"] = (-V).detach().cpu().numpy()
+    for fq in freqs:
+        for kv, label in kappas:
+            with torch.no_grad():
+                V, _, _ = hedge_pnl(S_test, bs_delta_hedge(S_test, k, r, sigma, t, m, fq),
+                                    k, r, dt, m, kv)
+            dump[f"bs_f{fq}_{label}"] = (-V).detach().cpu().numpy()
+    np.savez(out_dir / "test_losses.npz", **dump)
+    console.print(f"[dim]per-path test losses -> {out_dir / 'test_losses.npz'}[/]")
+
+    # ------------------------------------------------------------------
+    # 5. Figures
+    # ------------------------------------------------------------------
 
     epochs = history["epoch"]
     fig = go.Figure()

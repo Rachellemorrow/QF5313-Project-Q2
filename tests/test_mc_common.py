@@ -80,6 +80,22 @@ def test_geo_moments_positive_variance():
     assert math.isfinite(mu_g)
 
 
+def test_geo_variance_exact_discrete_sum():
+    """Regression test: var_G must equal sigma^2 * (T/m)/m^2 * sum_{i,j} min(i,j),
+    with sum_{i,j} min(i,j) = m(m+1)(2m+1)/6 — for T != 1 (catches the T^2 bug)."""
+    for t_years in (0.5, 1.0, 2.0, 7.3):
+        for m in (1, 2, 12, 252):
+            s0, r, sigma = 100.0, 0.03, 0.25
+            _, var_g = mc.geometric_asian_moments(s0, r, sigma, t_years, m)
+            dt = t_years / m
+            min_sum = sum(min(i, j) for i in range(1, m + 1) for j in range(1, m + 1))
+            assert min_sum == pytest.approx(m * (m + 1) * (2 * m + 1) / 6)
+            expected = sigma * sigma * dt / (m * m) * min_sum
+            assert var_g == pytest.approx(expected, rel=1e-12)
+            # also equals closed form sigma^2 * T * (m+1)(2m+1) / (6 m^2)
+            assert var_g == pytest.approx(sigma * sigma * t_years * (m + 1) * (2 * m + 1) / (6 * m * m), rel=1e-12)
+
+
 def test_payoff_boundaries():
     paths = np.array([[100.0, 110.0, 90.0, 105.0], [100.0, 80.0, 70.0, 60.0]])
     asian = mc.payoff_asian(paths, k=100.0)
