@@ -178,6 +178,16 @@ All consistent with −1/2 within ~2 SE (slope SEs ≈ 0.02). The CV slope is sl
 
 Zero hedge (same accounting, Δ ≡ 0): CVaR₉₅ ≈ **1891** (test). Neural vs BS-1d at **matched cost**: −3.1 (0 bp), **−15.2** (10 bp), **−46.1** (50 bp) — advantage grows with κ, as expected for a strategy trained to hold costs down (turnover 5.14 vs 5.59). At matched κ the neural policy beats all nine BS grid cells (closest call: 5d–50bp, 461.5 vs 466.6). Neural CVaR also beats BS-1d at 10/50 bp with lower variance than BS-1d (582/622 vs 657/2119) — but at **0 bp neural variance is higher** (755 vs 572): the CVaR objective buys tail protection, not variance reduction, and BS-1d remains the variance winner. All val≈test rows agree to <0.5 CVaR point — the improvement persists out-of-sample. **Honest caveat:** at 0 bp the neural edge (≈3 CVaR points ≈ 0.9 %) is small and model-implied; it is *not* evidence of real-world superiority.
 
+**Paired bootstrap (same test paths, B = 10 000, seed 42, percentile CIs), ΔCVaR₉₅ = neural − BS:**
+
+| κ \ comparator | BS-1d | BS-5d | BS-21d |
+|---|---|---|---|
+| 0 bp | **−3.12** [−3.73, −2.52] | −46.21 [−47.85, −44.57] | −134.09 [−137.60, −130.59] |
+| 10 bp | **−15.19** [−15.93, −14.46] | −44.71 [−46.37, −43.03] | −126.10 [−129.72, −122.49] |
+| 50 bp | **−46.06** [−47.06, −45.04] | −5.14 [−7.12, −3.22] | −57.30 [−61.00, −53.44] |
+
+All nine 95 % CIs exclude zero (P(neural better) = 1.000 in every resample): because both policies are evaluated on the *same* paths, sampling noise nearly vanishes (path-loss correlations 0.16–0.71), so even the ~3-point zero-cost edge is statistically detectable. It is **economically small** (~0.9 % of the 0-hedge CVaR) and, like everything here, model-implied under the risk-neutral simulator — not a physical-measure guarantee. Bootstrap artifacts: `results/approach2/if/test_losses.npz` (per-path L = −V_T, 2¹⁵ test paths) and `bootstrap_cvar.json`; produced by `code/bootstrap_cvar.py` from the clone reproduction (values identical to the main-repo run; only `fit_seconds` differs, 821 s vs 1221 s).
+
 ### 4.8 NumPy vs PyTorch engine agreement
 
 All four payoffs agree within combined SE (max pair gap: vanilla 2.65 ≤ 6.04; barrier 0.25 ≤ 1.63). Torch engine uses float64 and an independent RNG (seed 4242).
@@ -205,19 +215,19 @@ All four payoffs agree within combined SE (max pair gap: vanilla 2.65 ≤ 6.04; 
 
 | # | Sev | Finding | Disposition |
 |---|---|---|---|
-| 1 | BLOCKER | `SESSION.md` missing | **In progress** — produced from the authentic OpenCode export at finalization (before `submission` tag); never fabricated. |
+| 1 | BLOCKER | `SESSION.md` missing | **FIXED** — complete authentic OpenCode export (lead + 4 child sessions, secret-scanned, verbatim JSON); embedded payloads verified byte-identical to fresh `opencode session export` output (child sessions byte-identical; lead session re-exported at finalization to include all post-audit work); committed. |
 | 2 | BLOCKER | `report.md` §4/§7 placeholders | **FIXED** — §4 populated with measured numbers; this section added. |
 | 3 | MAJOR | `compare.py` found no CVaR rows (flat keys undetected); `comparison.html` said "No CVaR tables found" | **FIXED** — flat `<name>_<split>_{cvar95,mean_pnl,var_pnl}` parsing added; ranked 25-row table printed and written to `results/comparison.html` (verified). |
-| 4 | MAJOR | Discrete geometric-Asian variance used σ²T²(m+1)(2m+1)/(6m²); correct is σ²T(m+1)(2m+1)/(6m²) | **CONFIRMED & FIXED** (code + report; T = 1 so no numerical change, but the spec is now dimensionally correct for T ≠ 1). Independently re-derived: Var(ln G) = σ²(T/m)/m² · Σ_{i,j} min(i,j) = σ²T(m+1)(2m+1)/(6m²). Tests still pass (14/14). |
+| 4 | MAJOR | Discrete geometric-Asian variance used σ²T²(m+1)(2m+1)/(6m²); correct is σ²T(m+1)(2m+1)/(6m²) | **CONFIRMED & FIXED** (code + report; T = 1 so no numerical change, but the spec is now dimensionally correct for T ≠ 1). Independently re-derived: Var(ln G) = σ²(T/m)/m² · Σ_{i,j} min(i,j) = σ²T(m+1)(2m+1)/(6m²). Regression test `test_geo_variance_exact_discrete_sum` added (fails on the old formula for T ≠ 1; 15/15 tests pass). |
 | 5 | MAJOR | Docstring sign: claimed "good delta hedge has E[V_T] ~ +e^{rT}·C_BS > 0" | **FIXED** — now states E[V_T] ≈ −e^{rT}·C_BS (premium excluded); measured −300.7 vs −333.7 (residual ≈ +33 = drift term, see §4.7). |
 | 6 | MINOR | README 17 lines (limit 10) | **FIXED** — 10 lines; commands verified. |
 | 7 | MINOR | Early stopping never triggers (min_delta = 1e-4 on ~360 scale); "early stopping" overstated | **FIXED (disclosure)** — best-checkpoint selection documented in code help-strings and §4.7; no claim of early stop is made anywhere. |
 | 8 | MINOR | Torch engine not validated against BS (z = +2.487) | **FIXED** — `z_score_torch` added to approach-1 output and metrics.json; both engines reported (§4.1). |
-| 9 | MINOR | Vacuous assertion `d1 == approx(d1)` in tests; no integration test | **FIXED** — assertion replaced by parity + d1-ATM + vega tests (14 tests, all pass); CLI smoke-tested manually (full runs executed). |
+| 9 | MINOR | Vacuous assertion `d1 == approx(d1)` in tests; no integration test | **FIXED** — assertion replaced by parity + d1-ATM + vega tests; regression test for the discrete geometric-Asian variance added (15 tests, all pass); CLI smoke-tested manually (full runs executed). |
 | 10 | INFO | Docstring said n = 1213 returns; actual 1214 | **FIXED** in docstring. |
 | 11 | INFO | Model identifiers not verifiable without SESSION.md | **FIXED** — actual provider/model IDs disclosed in §6 (this session: `opencode/pulse-alpha-free` lead; `deepseek/deepseek-v4-pro` numerical subagent; `moonshotai/kimi-k2.7-code` auditor; Kimi plan key expired — disclosed). |
 
-**Kimi verdict:** PASS WITH FIXES → after the above repairs, **all confirmed defects are repaired and re-verified** (re-ran approach-1 end-to-end; 14/14 tests; comparison.html regenerated; clean-clone reproduction re-verified, §8). Remaining open item: SESSION.md export (deliverable 4), then final `submission` tag.
+**Kimi verdict:** PASS WITH FIXES → after the above repairs, **all confirmed defects are repaired and re-verified** (re-ran approach-1 end-to-end; 15/15 tests; comparison.html regenerated; full clean-clone reproduction including Option B — bitwise-identical metrics except `fit_seconds`, §8). SESSION.md export (deliverable 4) completed and verified against fresh OpenCode exports; tag `submission` points at the final verified tree.
 
 **Training-pathology post-mortem (this run, honestly reported).** The first DeepSeek implementation warm-started η at the empirical CVaR of the unhedged loss and let Adam move η; η tracked the collapsing VaR far too slowly (updates ≈ lr per step; VaR falls by O(10³)), so the network was rewarded for an unhedged policy and stopped at val CVaR ≈ 898 (epoch 2). The fix was **not** to change the objective but to solve it exactly: coordinate descent on the Rockafellar–Uryasev problem — exact α-quantile η-step (convex subproblem) alternate with Adam steps on θ, gradients only through the L > η tail. Confirmed working: val CVaR 1036 → 359.6 (epoch 48), no NaN, grad-norm clip 10, val ≈ test across all 12 reported rows. A purely gradient-based η is documented as a failed alternative in the code. The theoretical objective, the payoff, the accounting, and the benchmark set were **not** altered to obtain better numbers.
 
@@ -225,7 +235,7 @@ All four payoffs agree within combined SE (max pair gap: vanilla 2.65 ≤ 6.04; 
 
 Fresh clone: `uv sync --frozen` (UV_CACHE_DIR=.cache/uv), then the commands in README.md (≤10 lines). Offline: snapshot committed; `--verify-only` checks SHA-256. Seeds: 42 (train/main), 123 (val), 2026 (test), 4242 (torch cross-check). Nondeterminism: torch CPU ops may be multithreaded; results are reproducible up to BLAS threading noise; no GPU used. `results/` is gitignored and regenerable; `data/clean/` is committed.
 
-**Verified (2026-11-03, tag `submission`):** fresh clone → `uv sync --frozen` OK → snapshot SHA-256 all OK → 14/14 tests pass → `approach1_pricing.py --seed 42` end-to-end OK (71 s; BS z = +0.627 numpy / +2.487 torch; comparison report regenerated) → `compare.py` OK → `comparison.html` written. `approach2_hedging.py --seed 42` was executed twice in the main repo (1221 s; metrics in `results/approach2/if/metrics.json`).
+**Verified (2026-11-03, tag `submission`):** fresh clone → `uv sync --frozen` OK → snapshot SHA-256 all OK → 15/15 tests pass → `approach1_pricing.py --seed 42` end-to-end OK (71 s; BS z = +0.627 numpy / +2.487 torch; comparison report regenerated) → `compare.py` OK → `comparison.html` written. **Option B fully reproduced from the clean clone:** `approach2_hedging.py --seed 42` trained and evaluated end-to-end (821 s); the reproduced `metrics.json` is **bitwise-identical** to the main-repo run except `fit_seconds` (1221 s there; machine-load difference), and `bootstrap_cvar.py` reproduced the paired-bootstrap CIs (§4.7) exactly. No network access was needed at any point.
 
 ## 9. Figure index
 
@@ -236,4 +246,5 @@ Fresh clone: `uv sync --frozen` (UV_CACHE_DIR=.cache/uv), then the commands in R
 * `results/approach2/if/training_curve.html` — train/val CVaR vs epoch
 * `results/approach2/if/pnl_distribution.html` — test P&L distributions
 * `results/approach2/if/benchmark_bars.html` — CVaR95 across hedging methods
+* `results/approach2/if/test_losses.npz` / `bootstrap_cvar.json` — per-path test losses & paired bootstrap (§4.7; via `code/bootstrap_cvar.py`)
 * `results/comparison.html` — aggregated comparison (code/compare.py)
