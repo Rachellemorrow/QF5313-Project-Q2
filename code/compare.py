@@ -1,6 +1,5 @@
 """Aggregate newly executed Q2 results into standalone comparison tables."""
 import argparse
-import html
 import json
 from pathlib import Path
 
@@ -13,6 +12,9 @@ def flatten(value, prefix=""):
     if isinstance(value, dict):
         for key, child in value.items():
             yield from flatten(child, f"{prefix}.{key}" if prefix else str(key))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from flatten(child, f"{prefix}[{index}]")
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
         yield prefix, value
 
