@@ -1,0 +1,14 @@
+[project]
+name = "q2-independent-rebuild"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "numpy==2.2.6", "scipy==1.15.3", "pandas==2.3.1",
+  "torch==2.7.1", "plotly==6.2.0", "rich==14.1.0",
+  "akshare==1.17.85", "pytest==8.4.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["code"]
+testpaths = ["tests"]
+python_files = ["test_*.py", "integration_*.py"]

@@ -1,0 +1,89 @@
+{
+  "S0": 3978.8,
+  "K": 3978.8,
+  "B": 4774.56,
+  "r": 0.01428744660806955,
+  "sigma": 0.2007613270624535,
+  "mu": 0.039514518383037385,
+  "annual_mean_log_return": 0.019361963161098672,
+  "T": 1.0,
+  "steps": 252,
+  "observations": 2375,
+  "returns": 2374,
+  "start": "2017-01-17",
+  "end": "2026-11-03",
+  "rate_date": "2026-11-03",
+  "rate_quote_1Y_percent": 1.439,
+  "abs_log_return_above_5pct": [
+    {
+      "date": "2018-02-09",
+      "log_return": -0.055452621380029044
+    },
+    {
+      "date": "2018-10-11",
+      "log_return": -0.056990309643564885
+    },
+    {
+      "date": "2018-10-22",
+      "log_return": 0.05635734379646529
+    },
+    {
+      "date": "2019-02-25",
+      "log_return": 0.07098346855177873
+    },
+    {
+      "date": "2019-05-06",
+      "log_return": -0.06486221465375053
+    },
+    {
+      "date": "2020-02-03",
+      "log_return": -0.10635690036698975
+    },
+    {
+      "date": "2020-03-16",
+      "log_return": -0.053319950058776655
+    },
+    {
+      "date": "2020-07-06",
+      "log_return": 0.07157632523194302
+    },
+    {
+      "date": "2020-07-16",
+      "log_return": -0.052047013828394384
+    },
+    {
+      "date": "2022-03-15",
+      "log_return": -0.054555840849612736
+    },
+    {
+      "date": "2022-03-16",
+      "log_return": 0.05210232411596749
+    },
+    {
+      "date": "2022-04-25",
+      "log_return": -0.0516633240859985
+    },
+    {
+      "date": "2024-09-26",
+      "log_return": 0.051997643773949775
+    },
+    {
+      "date": "2024-09-27",
+      "log_return": 0.06469528142528702
+    },
+    {
+      "date": "2024-09-30",
+      "log_return": 0.08336906902030883
+    },
+    {
+      "date": "2024-10-09",
+      "log_return": -0.07989409078803789
+    },
+    {
+      "date": "2025-04-07",
+      "log_return": -0.10556324086450353
+    }
+  ],
+  "model": "assignment drift-r GBM, not zero-drift Black-76 futures",
+  "return_convention": "Successive observed daily log close ratios; annualization 252; sample variance ddof=1; no holiday imputation or roll correction."
+}

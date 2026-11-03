@@ -1,0 +1,62 @@
+{
+  "retrieved_utc": "2026-11-03T17:21:11.687062+00:00",
+  "akshare_version": "1.17.85",
+  "cutoff": "2026-11-03",
+  "artifacts": {
+    "if_main.csv": {
+      "sha256": "ac7f562fcf7aec443972aedbaf7758a4880c114f4644831dd37ee6be127d6aa6",
+      "source": "ak.futures_main_sina(IF0)",
+      "url": "https://finance.sina.com.cn/futures/quotes/IF0.shtml",
+      "schema": {
+        "date": "object",
+        "close": "float64"
+      },
+      "rows": 2375,
+      "start": "2017-01-17",
+      "end": "2026-11-03",
+      "missing_cells": 0,
+      "weekday_dates_without_observation": 181,
+      "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."
+    },
+    "csi300_index.csv": {
+      "sha256": "2aa669e1b053052237c2295111d0aec43aa9da16c4d2571f125d1bc981a9ea84",
+      "source": "ak.stock_zh_index_daily(sh000300)",
+      "url": "https://finance.sina.com.cn/realstock/company/sh000300/nc.shtml",
+      "schema": {
+        "date": "object",
+        "close": "float64"
+      },
+      "rows": 2386,
+      "start": "2017-01-03",
+      "end": "2026-11-03",
+      "missing_cells": 0,
+      "weekday_dates_without_observation": 180,
+      "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."
+    },
+    "shibor.csv": {
+      "sha256": "3e1f71778c7791420476c123a5068d85c7d831e2f982dd2cbfe15d77d269a5a6",
+      "source": "ak.macro_china_shibor_all()",
+      "url": "https://cdn.jin10.com/data_center/reports/il_1.json",
+      "schema": {
+        "date": "object",
+        "O/N": "float64",
+        "1W": "float64",
+        "2W": "float64",
+        "1M": "float64",
+        "3M": "float64",
+        "6M": "float64",
+        "9M": "float64",
+        "1Y": "float64"
+      },
+      "rows": 2396,
+      "start": "2017-03-17",
+      "end": "2026-11-03",
+      "missing_cells": 0,
+      "weekday_dates_without_observation": 174,
+      "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."
+    }
+  },
+  "futures_series": "Sina IF0 vendor main continuous series; not individual deliverable contracts. No roll adjustment applied. Vendor snapshot has no constituent contract identifier, so precise roll dates and roll jumps cannot be independently identified. Large changes are flagged, never silently removed.",
+  "index_source_note": "Sina AKShare index endpoint used instead of Eastmoney index_zh_a_hist; same CSI300 underlying.",
+  "rate_convention": "SHIBOR percentage deposit rates, ACT/360 simple quotes; zero=log1p(quote*tenor)/tenor; linear interpolation in continuous zero rates. 1Y=360/360; no extrapolation."
+}
