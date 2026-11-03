@@ -93,6 +93,9 @@ def verify_calibrate():
     if (pd.Timestamp(f.date.iloc[-1]) - pd.Timestamp(f.date.iloc[0])).days < 365.25 * 5:
         raise ValueError("Less than five years of futures data")
     ret = np.diff(np.log(f.close.to_numpy()))
+    index = frames["csi300_index.csv"]
+    index_dates = set(index.loc[(index.date >= f.date.iloc[0]) & (index.date <= f.date.iloc[-1]), "date"])
+    missing_against_index = sorted(index_dates - set(f.date))
     sigma = float(np.std(ret, ddof=1) * np.sqrt(252))
     log_drift = float(np.mean(ret) * 252)
     rates = frames["shibor.csv"]
@@ -108,6 +111,8 @@ def verify_calibrate():
         "T": 1., "steps": 252, "observations": len(f), "returns": len(ret),
         "start": f.date.iloc[0], "end": f.date.iloc[-1], "rate_date": last.date,
         "rate_quote_1Y_percent": float(last["1Y"]),
+        "index_trading_dates_without_futures": missing_against_index,
+        "gap_treatment": "No fill. Successive-observation returns include gaps; 252 annualization is an approximation. Index calendar is a cross-check, not an official CFFEX calendar.",
         "abs_log_return_above_5pct": [{"date": f.date.iloc[i+1], "log_return": float(ret[i])} for i in flags],
         "model": "assignment drift-r GBM, not zero-drift Black-76 futures",
         "return_convention": "Successive observed daily log close ratios; annualization 252; sample variance ddof=1; no holiday imputation or roll correction."}

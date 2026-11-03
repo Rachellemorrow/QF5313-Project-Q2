@@ -14,6 +14,10 @@
   "end": "2026-11-03",
   "rate_date": "2026-11-03",
   "rate_quote_1Y_percent": 1.439,
+  "index_trading_dates_without_futures": [
+    "2017-10-09"
+  ],
+  "gap_treatment": "No fill. Successive-observation returns include gaps; 252 annualization is an approximation. Index calendar is a cross-check, not an official CFFEX calendar.",
   "abs_log_return_above_5pct": [
     {
       "date": "2018-02-09",
