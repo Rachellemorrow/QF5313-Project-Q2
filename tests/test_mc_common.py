@@ -46,12 +46,21 @@ def test_antithetic_odd_rejected():
 
 def test_black_scholes_put_call_parity():
     call = mc.black_scholes_call(P.s0, P.k, P.r, P.sigma, P.t)
-    d1 = (math.log(P.s0 / P.k) + (P.r + 0.5 * P.sigma**2) * P.t) / (P.sigma * math.sqrt(P.t))
-    put = call - P.s0 + P.k * math.exp(-P.r * P.t)
-    assert put > 0
     df = math.exp(-P.r * P.t)
+    put = call - P.s0 + P.k * df
+    assert put > 0
     assert abs((call - put) - (P.s0 - P.k * df)) < 1e-8
-    assert d1 == pytest.approx(d1)
+
+
+def test_black_scholes_vega_positive():
+    call = mc.black_scholes_call(P.s0, P.k, P.r, P.sigma, P.t)
+    assert mc.black_scholes_call(P.s0, P.k, P.r, 2 * P.sigma, P.t) > call
+
+
+def test_d1_spot_atm():
+    # ATM forward relation: d1 = (r + sigma^2/2) * sqrt(T) / sigma when K == S0
+    d1 = (math.log(P.s0 / P.k) + (P.r + 0.5 * P.sigma**2) * P.t) / (P.sigma * math.sqrt(P.t))
+    assert d1 == pytest.approx((P.r + 0.5 * P.sigma**2) * math.sqrt(P.t) / P.sigma)
 
 
 def test_black_scholes_intrinsic_bounds():

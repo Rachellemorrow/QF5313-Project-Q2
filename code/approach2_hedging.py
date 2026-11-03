@@ -25,7 +25,10 @@ Accounting conventions (documented here AND in metrics.json, and echoed in the t
   * Premium convention: the option premium is EXCLUDED from V_T exactly as the assignment writes
     it.  Adding the constant premium e^{rT}*C_BS would shift mean P&L and CVaR equally for EVERY
     policy, so it changes no comparison and leaves variance/turnover unchanged; we therefore omit
-    it and note this.  (Consequently a good delta hedge has E[V_T] ~ e^{rT}*C_BS > 0.)
+    it and note this.  (With the premium excluded, a replicating hedge has
+    E[V_T] ~ -e^{rT}*C_BS up to discretization/cost error: the hedger pays the claim out of
+    the hedge gains alone. Adding the premium back shifts the mean by +e^{rT}*C_BS for every
+    policy identically and leaves all comparisons unchanged.)
   * The SAME accounting applies to the neural policy and to every Black-Scholes baseline.
 
 Risk measure: L = -V_T; CVaR_0.95 of L is minimised via Rockafellar-Uryasev
@@ -76,8 +79,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lr", type=float, default=1e-3, help="Adam learning rate")
     p.add_argument("--epochs", type=int, default=60, help="max epochs")
     p.add_argument("--batch-size", type=int, default=4096, help="minibatch size (paths)")
-    p.add_argument("--patience", type=int, default=12, help="early-stopping patience")
-    p.add_argument("--min-delta", type=float, default=1e-4, help="early-stopping min delta")
+    p.add_argument("--patience", type=int, default=12, help="best-checkpoint patience (no early stop occurred: best-val state is restored at the end)")
+    p.add_argument("--min-delta", type=float, default=1e-4, help="min delta on val CVaR to reset patience (best-checkpoint selection, not an early stop in the logged run)")
     p.add_argument("--train-kappa", type=float, default=0.001,
                    help="transaction cost (decimal) the neural policy is trained at")
     p.add_argument("--threads", type=int, default=8,

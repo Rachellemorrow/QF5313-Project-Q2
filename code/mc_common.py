@@ -18,7 +18,7 @@ Conventions (authoritative)
   it with a futures-price model; a Black-76 cross-check, if produced, is labelled separately.
 
 * Historical (physical) estimates, from IF0 close log returns, trailing 5 calendar years
-  (2021-10-29 .. 2026-11-02, n=1213): mu_hat = mean*252, sigma_hat = std(ddof=1)*sqrt(252).
+  (2021-10-28 .. 2026-11-02, n=1214): mu_hat = mean*252, sigma_hat = std(ddof=1)*sqrt(252).
   sigma_hat is used for BOTH physical-drift disclosure and risk-neutral simulation volatility.
   mu_hat is reported for completeness and is NOT used in risk-neutral pricing.
 
@@ -41,7 +41,7 @@ Conventions (authoritative)
 * Geometric Asian control variate: under Q, for the SAME discrete monitoring grid,
   G = (prod_i S_{t_i})^(1/m) is lognormal with
       mu_G   = ln(S0) + (r - sigma^2/2) * T * (m + 1) / (2 m)
-      var_G  = sigma^2 * T^2 * (m + 1) * (2 m + 1) / (6 * m^2)
+      var_G  = sigma^2 * T * (m + 1) * (2 m + 1) / (6 * m^2)
   and E[G] = exp(mu_G + var_G / 2). The control-variate estimator for the arithmetic Asian
   call uses the closed-form geometric-Asian CALL price (not E[G]) as control:
       price_geo = exp(-rT) * (exp(mu_G + var_G/2) * N(d1) - K * N(d2)),
@@ -204,7 +204,7 @@ def black_scholes_call(s0: float, k: float, r: float, sigma: float, t: float) ->
 def geometric_asian_moments(s0: float, r: float, sigma: float, t: float, m: int):
     """Exact moments of the discrete geometric average over t_i = i*T/m, i=1..m, under Q."""
     mu_g = math.log(s0) + (r - 0.5 * sigma * sigma) * t * (m + 1) / (2 * m)
-    var_g = sigma * sigma * t * t * (m + 1) * (2 * m + 1) / (6 * m * m)
+    var_g = sigma * sigma * t * (m + 1) * (2 * m + 1) / (6 * m * m)
     return mu_g, var_g
 
 

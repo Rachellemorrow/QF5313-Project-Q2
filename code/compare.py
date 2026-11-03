@@ -58,17 +58,41 @@ def print_metrics_table(title: str, label: str, flat: dict) -> None:
 
 
 def cvar_rows(flat: dict) -> list[tuple[str, float, float, float]]:
-    """Extract (method, mean_pnl, var_pnl, cvar95) rows if present (approach2 schema)."""
+    """Extract (method, mean_pnl, var_pnl, cvar95) rows.
+
+    Supports the flat approach2 schema: keys like ``neural_0bp_test_cvar95``,
+    ``neural_0bp_test_mean_pnl``, ``neural_0bp_test_var_pnl`` (suffix ``_test``/``_val``),
+    and the legacy dotted nested schema.
+    """
     rows = []
-    # expect keys like metrics.neural_k0000.cvar95 or nested dicts already flattened
+    # --- flat schema: <name>_<split>_cvar95 with split in {test, val}
+    names = sorted({k[: -len("_cvar95")] for k in flat if k.endswith("_cvar95") and "." not in k})
+    seen = set()
+    for base in names:
+        cvar = flat.get(f"{base}_cvar95")
+        mean = flat.get(f"{base}_mean_pnl", flat.get(f"{base}_expected_pnl"))
+        var = flat.get(f"{base}_var_pnl", flat.get(f"{base}_pnl_variance"))
+        if cvar is None:
+            continue
+        if mean is None or var is None:
+            continue  # aggregate/duplicate keys (e.g. neural_best_val_cvar95)
+        rows.append((base,
+                     float(mean) if mean is not None else float("nan"),
+                     float(var) if var is not None else float("nan"),
+                     float(cvar)))
+        seen.add(base)
+    # --- dotted nested schema: <prefix>.cvar95
     prefixes = sorted({k.rsplit(".", 1)[0] for k in flat if k.endswith(".cvar95")})
     for p in prefixes:
         cvar = flat.get(f"{p}.cvar95")
+        if cvar is None or p in seen:
+            continue
         mean = flat.get(f"{p}.mean_pnl", flat.get(f"{p}.expected_pnl"))
         var = flat.get(f"{p}.var_pnl", flat.get(f"{p}.pnl_variance"))
-        if cvar is not None:
-            rows.append((p, float(mean) if mean is not None else float("nan"),
-                         float(var) if var is not None else float("nan"), float(cvar)))
+        rows.append((p,
+                     float(mean) if mean is not None else float("nan"),
+                     float(var) if var is not None else float("nan"),
+                     float(cvar)))
     return rows
 
 

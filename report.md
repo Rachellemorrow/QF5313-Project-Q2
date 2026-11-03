@@ -61,7 +61,7 @@ European call: C_BS = S0·N(d1) − K e^{−rT} N(d2), d1,2 = [ln(S0/K) ± (r ±
 
 For the same discrete grid, G = (Π S_{t_i})^{1/m} is lognormal with
 
-μ_G = ln S0 + (r − σ²/2)·T·(m+1)/(2m),   var_G = σ²T²·(m+1)(2m+1)/(6m²),
+μ_G = ln S0 + (r − σ²/2)·T·(m+1)/(2m),   var_G = σ²T·(m+1)(2m+1)/(6m²)  (exact for the discrete t_i grid),
 
 E[G] = e^{μ_G + var_G/2}, and the geometric-Asian call price has the Black–Scholes-type closed form (d1 = (μ_G − ln K + var_G)/√var_G). The control-variate estimator for the arithmetic Asian call uses per-path geometric payoffs as the control with the closed-form geometric-Asian call as the reference expectation; β̂ = Ĉov(A,G)/V̂ar(G) estimated in-sample (asymptotically unbiased at N = 2^17).
 

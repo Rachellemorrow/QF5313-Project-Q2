@@ -409,6 +409,7 @@ def main() -> int:
 
     bs = mc.black_scholes_call(p.s0, p.k, p.r, p.sigma, p.t)
     z_score = (mc_np - bs) / se_np
+    z_score_torch = (mc_torch - bs) / se_torch
     diff_np_torch = abs(mc_np - mc_torch)
     cross_ok = diff_np_torch <= 3.0 * math.sqrt(se_np ** 2 + se_torch ** 2)
 
@@ -418,6 +419,7 @@ def main() -> int:
         f"NumPy MC              = {mc_np:.6f}  (SE {se_np:.4f})\n"
         f"PyTorch MC (seed {args.torch_seed}) = {mc_torch:.6f}  (SE {se_torch:.4f})\n"
         f"z = (MC_np - BS)/SE   = {z_score:+.3f}   [PASS |z|<=3: {abs(z_score) <= 3}]\n"
+        f"z = (MC_torch - BS)/SE = {z_score_torch:+.3f}   [PASS |z|<=3: {abs(z_score_torch) <= 3}]\n"
         f"|np - torch|          = {diff_np_torch:.4f}   [PASS <=3*sqrt(se^2+se^2): {cross_ok}]"
     ))
 
@@ -648,6 +650,7 @@ def main() -> int:
             "bs_price": bs, "mc_numpy": mc_np, "mc_numpy_se": se_np,
             "mc_torch": mc_torch, "mc_torch_se": se_torch,
             "z_score": z_score, "z_pass": bool(abs(z_score) <= 3),
+            "z_score_torch": z_score_torch, "z_pass_torch": bool(abs(z_score_torch) <= 3),
             "numpy_torch_diff": diff_np_torch,
             "cross_check_pass": bool(cross_ok),
         },
@@ -691,7 +694,8 @@ def main() -> int:
     # ---- 9. summary ----------------------------------------------------------
     summary = Table(title="Summary", header_style="bold")
     summary.add_column("Quantity"); summary.add_column("Value")
-    summary.add_row("BS z-score (vanilla)", f"{z_score:+.3f}  ({'PASS' if abs(z_score) <= 3 else 'FAIL'})")
+    summary.add_row("BS z-score (vanilla, numpy)", f"{z_score:+.3f}  ({'PASS' if abs(z_score) <= 3 else 'FAIL'})")
+    summary.add_row("BS z-score (vanilla, torch)", f"{z_score_torch:+.3f}  ({'PASS' if abs(z_score_torch) <= 3 else 'FAIL'})")
     summary.add_row("Asian naive price", f"{naive_price:.4f} ± {naive_se:.4f}")
     summary.add_row("Asian antithetic price", f"{anti_price:.4f} ± {anti_se:.4f}")
     summary.add_row("Asian CV price", f"{cv_price:.4f} ± {cv_se:.4f}")
