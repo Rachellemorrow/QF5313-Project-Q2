@@ -1,0 +1,9 @@
+.venv/
+.cache/
+__pycache__/
+.pytest_cache/
+results/
+data/raw/
+*.ipynb
+.env
+*.key
