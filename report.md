@@ -225,6 +225,8 @@ All four payoffs agree within combined SE (max pair gap: vanilla 2.65 ≤ 6.04; 
 
 Fresh clone: `uv sync --frozen` (UV_CACHE_DIR=.cache/uv), then the commands in README.md (≤10 lines). Offline: snapshot committed; `--verify-only` checks SHA-256. Seeds: 42 (train/main), 123 (val), 2026 (test), 4242 (torch cross-check). Nondeterminism: torch CPU ops may be multithreaded; results are reproducible up to BLAS threading noise; no GPU used. `results/` is gitignored and regenerable; `data/clean/` is committed.
 
+**Verified (2026-11-03, tag `submission`):** fresh clone → `uv sync --frozen` OK → snapshot SHA-256 all OK → 14/14 tests pass → `approach1_pricing.py --seed 42` end-to-end OK (71 s; BS z = +0.627 numpy / +2.487 torch; comparison report regenerated) → `compare.py` OK → `comparison.html` written. `approach2_hedging.py --seed 42` was executed twice in the main repo (1221 s; metrics in `results/approach2/if/metrics.json`).
+
 ## 9. Figure index
 
 * `results/approach1/if/convergence.html` — RMSE vs N, log–log, with fitted slopes (target −1/2)
