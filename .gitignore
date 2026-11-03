@@ -7,3 +7,5 @@ data/raw/
 *.ipynb
 .env
 *.key
+.DS_Store
+*.log
