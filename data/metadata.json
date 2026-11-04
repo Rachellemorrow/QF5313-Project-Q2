@@ -3,7 +3,7 @@
   "artifacts": {
     "data/clean/if_main.csv": {
       "sha256": "7e0eccecb23f69dcccaf4df873d14453ce3e8748399fd4c0cf3f0d99f79aa98c",
-      "source": "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/InnerFuturesNewService.getDailyKLine?symbol=IF0",
+      "source": "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_IF02021_08_17=/InnerFuturesNewService.getDailyKLine?symbol=IF0",
       "rows": 1899,
       "start": "2019-01-02",
       "end": "2026-11-03",

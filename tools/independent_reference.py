@@ -27,13 +27,18 @@ def calculate():
     g_z = (np.log(k)-meanlog)/np.sqrt(varlog)
     geo, geo_error = quad(lambda z: disc*(np.exp(meanlog+np.sqrt(varlog)*z)-k)*density(z), g_z, 12, epsabs=1e-9)
     closed_variance = v*v*T*(m+1)*(2*m+1)/(6*m*m)
-    assert np.isclose(varlog, closed_variance, rtol=1e-14)
+    if not np.isclose(varlog, closed_variance, rtol=1e-14):
+        raise ValueError("Geometric variance mismatch")
     geometric_closed = disc*(np.exp(meanlog+varlog/2)*ndtr(-g_z+np.sqrt(varlog))-k*ndtr(-g_z))
-    assert abs(geo-geometric_closed) < 1e-8
-    assert abs(bs-quadrature) < 1e-8
+    if abs(geo-geometric_closed) >= 1e-8 or abs(bs-quadrature) >= 1e-8:
+        raise ValueError("Quadrature versus closed form mismatch")
+    tail_bound = float(s*ndtr(v*np.sqrt(T)-12))
+    if tail_bound >= 1e-9:
+        raise ValueError("Quadrature tail exceeds tolerance; increase integration limit")
     return {"params": p, "metrics": {"bs_call": float(bs), "call_quadrature": quadrature,
         "quadrature_finite_interval_error_estimate": error, "bs_delta": float(ndtr(d1)),
         "bs_vega": float(s*np.sqrt(T)*density(d1)), "digital": float(disc*ndtr(d2)),
+        "vanilla_quadrature_tail_upper_bound": tail_bound,
         "geometric_asian_quadrature": geo, "geometric_quadrature_finite_interval_error_estimate": geo_error,
         "geometric_log_variance_from_covariance_matrix": float(varlog),
         "geometric_asian_closed_form": float(geometric_closed),

@@ -89,7 +89,7 @@ def live():
     CLEAN.mkdir(parents=True, exist_ok=True)
     raw = ROOT / "data/raw"
     raw.mkdir(parents=True, exist_ok=True)
-    url = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/InnerFuturesNewService.getDailyKLine"
+    url = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_IF02021_08_17=/InnerFuturesNewService.getDailyKLine"
     f = ak.futures_main_sina(symbol="IF0", start_date="20190101", end_date="20261104")
     f.to_csv(raw / "if_main_akshare.csv", index=False)
     futures = validate(f.rename(columns={"日期": "date", "收盘价": "close"})[["date", "close"]], "IF0")
@@ -145,14 +145,15 @@ def offline(refresh_diagnostics=False):
     params, quality = calibrate(*frames)
     if refresh_diagnostics:
         meta["calibration"] = quality
+        meta["diagnostics_refreshed_at_utc"] = datetime.now(timezone.utc).isoformat()
         META.write_text(json.dumps(meta, indent=2, allow_nan=False)+"\n")
     if not equivalent(quality, meta["calibration"]):
         raise ValueError("Stale calibration quality metadata")
     for name, frame in zip(("if_main", "csi300_index", "shibor"), frames):
         spec = meta["artifacts"][f"data/clean/{name}.csv"]
-        assert spec["rows"] == len(frame)
-        assert spec["start"] == str(frame.date.min().date()) and spec["end"] == str(frame.date.max().date())
-        assert spec["duplicates"] == 0 and spec["missing_values"] == 0
+        if (spec["rows"] != len(frame) or spec["start"] != str(frame.date.min().date())
+                or spec["end"] != str(frame.date.max().date()) or spec["duplicates"] != 0 or spec["missing_values"] != 0):
+            raise ValueError(f"Stale artifact quality metadata: {name}")
     saved = json.loads((CLEAN/"calibration.json").read_text())
     for key in params:
         if not np.isclose(params[key], saved[key], rtol=1e-12, atol=1e-12):

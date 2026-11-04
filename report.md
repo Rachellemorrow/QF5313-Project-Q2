@@ -23,6 +23,9 @@ date of IF, CSI300 and SHIBOR observations. Daily log returns are
 \(\hat\sigma=\sqrt{252\,s_x^2}\) and
 \(\hat\mu=252\bar x+\hat\sigma^2/2\). Historical drift is reported separately
 and is not used as the risk-neutral simulation drift.
+The daily mean is equivalently the intercept estimate in an intercept-only log-return
+regression. Metadata report both iid and Bartlett HAC standard errors for the
+annualized log drift; neither removes unknown continuous-contract roll effects.
 
 Sina IF0 is the provider's main continuous series. No independent back adjustment
 is applied. Constituent contract IDs and exact roll dates are unavailable in this
@@ -31,6 +34,24 @@ not certified roll identifications. Calibration therefore includes possible roll
 discontinuities. Weekday gaps include exchange holidays and are not automatically
 classified as missing observations; comparison against index trading dates is also
 reported. Duplicate dates and missing numerical values cause retrieval to fail.
+
+The executed snapshot contains 1,899 IF observations and 1,899 CSI300 observations
+from 2019-01-02 to 2026-11-03, plus 1,947 SHIBOR observations. The calibration window
+is 2020-11-03 to 2026-11-03 (1,455 prices, 1,454 log returns). There are no missing IF
+observations relative to the index's trading dates in this window. These counts and
+the following calibration values are recorded in `data/metadata.json` and
+`data/clean/calibration.json`:
+
+| Parameter | Executed value |
+|---|---:|
+| Initial level / strike | 3978.8 |
+| Barrier | 4774.56 |
+| Annualized volatility | 0.190647912849 |
+| Historical arithmetic GBM drift estimate | -0.012779861736 |
+| Annualized mean log return | -0.030953175072 |
+| One-year continuous discount rate | 0.014287446608 |
+
+Historical plots are `results/data/calibration.html` and `results/data/curve.html`.
 
 SHIBOR tenor quotes, expressed in percent per annum, are approximated as simple
 fixed-tenor-fraction deposit rates (days/365 for weeks, months/12 for months).
@@ -60,6 +81,13 @@ We evaluate \(z=(\widehat C-C)/\widehat{SE}\) and report actual violations
 of the assignment's \(|z|\le3\) criterion. Independent lead references use
 one-dimensional quadrature without importing the numerical implementation
 (`tools/independent_reference.py`).
+
+The newly executed independent reference artifact `results/independent/reference.json`
+gives a BS call value of 329.077643012334 and quadrature value of 329.077643012334
+(rounded), delta 0.567599324304 and vega 1564.469149519032 per unit volatility.
+The digital reference is 0.484891562413. The geometric-Asian quadrature reference is
+181.285332694516, independently agreeing with the discrete lognormal closed form.
+These are deterministic analytical checks, not Monte Carlo validation results.
 
 ## 4. Variance reduction and uncertainty
 
