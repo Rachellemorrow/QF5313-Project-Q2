@@ -26,15 +26,20 @@ def calculate():
     varlog = covariance.mean()
     g_z = (np.log(k)-meanlog)/np.sqrt(varlog)
     geo, geo_error = quad(lambda z: disc*(np.exp(meanlog+np.sqrt(varlog)*z)-k)*density(z), g_z, 12, epsabs=1e-9)
+    closed_variance = v*v*T*(m+1)*(2*m+1)/(6*m*m)
+    assert np.isclose(varlog, closed_variance, rtol=1e-14)
+    geometric_closed = disc*(np.exp(meanlog+varlog/2)*ndtr(-g_z+np.sqrt(varlog))-k*ndtr(-g_z))
+    assert abs(geo-geometric_closed) < 1e-8
     assert abs(bs-quadrature) < 1e-8
     return {"params": p, "metrics": {"bs_call": float(bs), "call_quadrature": quadrature,
-        "quadrature_absolute_error": error, "bs_delta": float(ndtr(d1)),
+        "quadrature_finite_interval_error_estimate": error, "bs_delta": float(ndtr(d1)),
         "bs_vega": float(s*np.sqrt(T)*density(d1)), "digital": float(disc*ndtr(d2)),
-        "geometric_asian_quadrature": geo, "geometric_quadrature_error": geo_error,
-        "geometric_log_variance_covariance_matrix": float(varlog),
+        "geometric_asian_quadrature": geo, "geometric_quadrature_finite_interval_error_estimate": geo_error,
+        "geometric_log_variance_from_covariance_matrix": float(varlog),
+        "geometric_asian_closed_form": float(geometric_closed),
         "terminal_mean": float(s*np.exp(r*T)),
         "terminal_variance": float(s*s*np.exp(2*r*T)*np.expm1(v*v*T))},
-        "fit_seconds": 0, "history": {"method": "Independent quadrature and full min(t_i,t_j) covariance matrix; no numerical-engine imports"}}
+        "fit_seconds": 0, "history": {"method": "Independent quadrature and full min(t_i,t_j) covariance matrix; no numerical-engine imports", "quadrature_truncation": "Upper Gaussian limit 12; omitted positive payoff tail bounded by discounted E[S] * Phi(sigma*sqrt(T)-12), below 1e-27 here; quadrature error estimates exclude this tail."}}
 
 
 if __name__ == "__main__":

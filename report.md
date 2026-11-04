@@ -33,7 +33,8 @@ classified as missing observations; comparison against index trading dates is al
 reported. Duplicate dates and missing numerical values cause retrieval to fail.
 
 SHIBOR tenor quotes, expressed in percent per annum, are approximated as simple
-ACT/365 deposit rates. We form \(z(u)=\log(1+q(u)u)/u\), linearly interpolate
+fixed-tenor-fraction deposit rates (days/365 for weeks, months/12 for months).
+We form \(z(u)=\log(1+q(u)u)/u\), linearly interpolate
 zero yields and discount by \(e^{-z(T)T}\). At the principal one-year maturity this
 uses the observed one-year node. This is an explicit deposit-curve approximation,
 not a bootstrapped arbitrage-free market zero curve.

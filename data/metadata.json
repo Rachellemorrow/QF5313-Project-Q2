@@ -59,7 +59,9 @@
     "observations": 1455,
     "log_return_count": 1454,
     "annual_log_drift": -0.030953175072438038,
-    "annual_log_drift_se": 0.07936885630994275,
+    "annual_log_drift_iid_se": 0.07936885630994275,
+    "annual_log_drift_hac_se": 0.07608978119405996,
+    "hac_bartlett_lags": 7,
     "mu": -0.012779861735666437,
     "sigma": 0.1906479128486415,
     "rate_date": "2026-11-03",
@@ -76,6 +78,58 @@
     "missing_weekdays_including_exchange_holidays": 111,
     "missing_index_trading_dates": [],
     "largest_absolute_daily_log_return": 0.10556324086450353,
+    "largest_daily_log_returns": [
+      {
+        "date": "2025-04-07",
+        "log_return": -0.10556324086450353,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2024-09-30",
+        "log_return": 0.08336906902030883,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2024-10-09",
+        "log_return": -0.07989409078803789,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2024-09-27",
+        "log_return": 0.06469528142528702,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2022-03-15",
+        "log_return": -0.054555840849612736,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2022-03-16",
+        "log_return": 0.05210232411596749,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2024-09-26",
+        "log_return": 0.051997643773949775,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2022-04-25",
+        "log_return": -0.0516633240859985,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2024-09-24",
+        "log_return": 0.04660789320731773,
+        "roll_classification": "unavailable"
+      },
+      {
+        "date": "2024-02-06",
+        "log_return": 0.040721081255121305,
+        "roll_classification": "unavailable"
+      }
+    ],
     "largest_basis_changes": [
       {
         "date": "2024-10-08T00:00:00.000",
@@ -149,7 +203,7 @@
       }
     ],
     "roll_policy": "Sina IF0 main continuous as published, no back adjustment applied. Constituent/roll flags unavailable; basis-change diagnostics cannot identify every roll or separate genuine moves. Volatility includes possible roll jumps.",
-    "rate_convention": "SHIBOR percent deposit quotes approximated as simple ACT/365 rates; continuously compounded zero yields log(1+q*t)/t linearly interpolated. Not a bootstrapped tradable zero curve."
+    "rate_convention": "SHIBOR percent deposit quotes with fixed tenor fractions: O/N=1/365, weeks=days/365, months=months/12, 1Y=1. Continuously compounded zero yields log(1+q*t)/t linearly interpolated. Not literal calendar ACT/365 for months or a bootstrapped tradable zero curve."
   },
   "retrieval_failures": [
     "Initial CffexFuturesService.getCffexFuturesDailyKLine IF0 trial returned only 588 records for 2019-2024 and failed coverage validation; replaced with assignment-prescribed futures_main_sina, newly retrieved."

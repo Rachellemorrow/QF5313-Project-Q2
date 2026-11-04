@@ -24,6 +24,7 @@ def main():
         [sys.executable, "data/fetch.py", "--offline"],
         [sys.executable, "-m", "pytest", "tests", "tests/integration_data.py", "-q"],
         [sys.executable, "tools/independent_reference.py"],
+        [sys.executable, "tools/data_diagnostics.py"],
         [sys.executable, "code/approach1_pricing.py", "--seed", str(args.seed)],
         [sys.executable, "code/approach2_hedging.py", "--seed", str(args.seed)],
         [sys.executable, "code/compare.py"],
