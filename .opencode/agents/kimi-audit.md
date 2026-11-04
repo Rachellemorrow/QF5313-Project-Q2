@@ -1,7 +1,7 @@
 ---
 description: Independent read-only mathematical and compliance auditor for Q2
 mode: subagent
-model: moonshotai/kimi-k3.1-pro
+model: moonshotai/kimi-k3.1-pro-highspeed
 permissions:
   - action: edit
     resource: "*"
