@@ -41,9 +41,20 @@ def calculate():
     black_quad, _ = quad(lambda z: disc*(s*np.exp(-v*v*T/2+v*np.sqrt(T)*z)-k)*density(z),black_z,12)
     if abs(black76-black_quad) >= 1e-8:
         raise ValueError("Secondary Black-76 deterministic validation failed")
+    digital_price = lambda spot, vol: disc*ndtr((np.log(spot/k)+(r-vol*vol/2)*T)/(vol*np.sqrt(T)))
+    digital_delta = float(disc*density(d2)/(s*v*np.sqrt(T)))
+    digital_vega = float(-disc*density(d2)*d1/v)
+    fd_delta = (digital_price(s*(1+1e-5),v)-digital_price(s*(1-1e-5),v))/(2e-5*s)
+    fd_vega = (digital_price(s,v*(1+1e-5))-digital_price(s,v*(1-1e-5)))/(2e-5*v)
+    if not np.allclose([fd_delta,fd_vega],[digital_delta,digital_vega],rtol=1e-7,atol=1e-10):
+        raise ValueError("Digital analytical Greeks versus deterministic differences failed")
     return {"params": p, "metrics": {"bs_call": float(bs), "call_quadrature": quadrature,
         "quadrature_finite_interval_error_estimate": error, "bs_delta": float(ndtr(d1)),
         "bs_vega": float(s*np.sqrt(T)*density(d1)), "digital": float(disc*ndtr(d2)),
+        "digital_delta": digital_delta,
+        "digital_vega": digital_vega,
+        "digital_deterministic_fd_delta": float(fd_delta),
+        "digital_deterministic_fd_vega": float(fd_vega),
         "vanilla_quadrature_tail_upper_bound": tail_bound,
         "secondary_black76_zero_drift_call": float(black76),
         "secondary_black76_zero_drift_quadrature": float(black_quad),

@@ -34,6 +34,7 @@ def main():
         f"Independent-pilot coefficient beta: {vr['beta']:.9f}; A/G correlation {vr['a_g_correlation']:.9f}. Production path budgets are matched; pilot overhead is {vr['pilot_paths']} additional paths ({vr['pilot_seconds']:.4f}s).",
         table(["Method","Variance reduction","Bootstrap lower","Bootstrap upper"],[[name,vr[key]["ratio"],vr[key]["ci_low"],vr[key]["ci_high"]] for name,key in [("Antithetic","vrr_antithetic"),("Control variate","vrr_cv")]])]
     g = am["greeks"]
+    reference = json.loads((ROOT/"results/independent/reference.json").read_text())["metrics"]
     rows = []
     for payoff,quantities in g["fd"].items():
         for quantity,bumps in quantities.items():
@@ -43,6 +44,7 @@ def main():
     lines += ["### Greeks",table(["Payoff","Greek","Fractional bump","FD","FD SE","Pathwise","Pathwise SE"],rows),
               table(["Paired PW minus FD","Mean difference","Paired SE","Difference/SE"],[[k,v["mean_diff"],v["se"],v["mean_diff"]/v["se"] if v["se"] else "undefined"] for k,v in g["paired_diff"].items()]),
               f"At the 10% spot bump, absolute paired delta difference/SE values are {abs(g['paired_diff']['vanilla_delta_h0.1']['mean_diff']/g['paired_diff']['vanilla_delta_h0.1']['se']):.3f} (vanilla) and {abs(g['paired_diff']['asian_delta_h0.1']['mean_diff']/g['paired_diff']['asian_delta_h0.1']['se']):.3f} (Asian). Thus agreement must be assessed bump by bump rather than asserted universally. Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.",
+              table(["Digital Greek","Bump fraction","FD","Analytical","(FD-analytical)/SE"],[[quantity,h,v["estimate"],reference[f"digital_{quantity}"],(v["estimate"]-reference[f"digital_{quantity}"])/v["se"]] for quantity,bumps in g["fd"]["digital"].items() for h,v in bumps.items()]),
               "### Convergence",table(["Estimator","RMSE slope","OLS slope SE","Bootstrap lower","Bootstrap upper","SE-versus-N slope"],[
                   [key,am["convergence"][f"slope_rmse_{key}"]["slope"],am["convergence"][f"slope_rmse_{key}"]["slope_se"],am["convergence"][f"slope_rmse_{key}_bootstrap"]["ci_low"],am["convergence"][f"slope_rmse_{key}_bootstrap"]["ci_high"],am["convergence"][f"slope_se_{key}"]["slope"]]
                   for key in ("vanilla_naive","asian_naive","asian_anti","asian_cv")]),
@@ -62,7 +64,7 @@ def main():
                 rows.append([freq,cost,policy,*[v[k] for k in ("cvar95","expected_pnl","pnl_variance","avg_cost","turnover")]])
     lines += [table(["Days","Cost","Policy","CVaR95","Mean P&L","P&L variance","Mean cost","Turnover (units)"],rows),
               "### Paired bootstrap uncertainty",table(["Combination","Observed neural minus BS CVaR","95% lower","95% upper"],[[k,v.get("point_diff",v["mean_diff"]),v["ci_low"],v["ci_high"]] for k,v in bm["bootstrap_cis_neural_minus_bs"].items()]),
-              "Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from this single training seed.",
+              "Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from one fitted network per cost.",
               f"Recorded approach wall times: A {a['fit_seconds']:.3f}s, B {b['fit_seconds']:.3f}s. Source figures: `results/approach1/if_main/{{convergence,greeks,profiling}}.html` and `results/approach2/{args.hedging_dataset}/{{training,comparison,loss_histogram}}.html`.",
               "<!-- GENERATED_RESULTS_END -->"]
     text = "\n\n".join(lines)

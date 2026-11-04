@@ -24,7 +24,10 @@ uv run python tools/clean_clone.py --seed 42
 ```
 
 Only after this returns PASS and the group approves the report and submission scope
-may the group create `git tag submission`. This repository covers Q2 only; coordinate
-that tag with the shared project if other selected questions live elsewhere.
+may the final `submission` tag be established. An inherited tag with that name already
+points to `0a27070dbeb1b569051c486e51351277a6d06c89`, not this rebuild. It has been
+preserved. Do not use it as this project's final submission; replacing or removing
+it requires explicit authorization recorded in a genuine session. This repository
+covers Q2 only; coordinate tagging with the shared project if other questions live elsewhere.
 Earlier direct pytest temporary-directory compliance cannot be repaired retroactively;
 see AUDIT.md. That limitation must remain disclosed at final acceptance.

@@ -27,11 +27,11 @@ This ledger distinguishes executable research completion from submission finaliz
 | Automated tests | PASS | 31 current tests; initial 17 incompatible external-to-scope failures recorded |
 | Figures and comparison | PASS | Standalone HTML and independent output checks |
 | Complete clean-clone A+B training reproduction | PASS | Commit 4c6c8af, fresh venv, cached offline dependencies, all eight stages successful; 325 pricing and 631 hedging/history numeric fields reproduced |
-| Final Kimi report-to-artifact audit | NOT VERIFIED | Review in progress |
+| Final Kimi report-to-artifact audit | PASS | Final read-only addendum accepts numerical correctness, report consistency and completed reproduction evidence |
 | All historical temporary writes inside repository | NOT VERIFIED | Earlier direct pytest tmp_path locality unverified; fixed local basetemp now enforced |
 | English report and statement of work | PASS | Draft report.md; student approval remains pending |
 | Authentic complete final session export | NOT VERIFIED | Genuine provisional parent/children export exists; final response must be exported after session ends |
-| Submission tag | NOT VERIFIED | Deferred until final export, reproduction and group scope approval |
+| Submission tag | NOT VERIFIED | Inherited tag points to 0a27070 (old history), not this rebuild; preserved unchanged. Updating it requires explicit approval after finalization |
 
 The final session cannot contain its own future export-confirmation response. Follow
 FINALIZE.md after the session becomes idle. No submission-ready claim is made while

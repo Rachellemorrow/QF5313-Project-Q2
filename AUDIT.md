@@ -132,3 +132,15 @@ at tolerances 1e-11 and 1e-10 respectively (timing excluded). Numerical source a
 lockfile hashes match. The canonical B outputs now come from this independently
 reproduced run; prior exploratory output was preserved in results/archive/.
 The canonical output checker and comparison/report generators then passed again.
+
+## Final Kimi addendum
+
+The final genuine Kimi invocation inspected completed clone evidence, numerical
+comparison results, canonical B replay verification, and the report/reference updates.
+Its verdict was **PASS for numerical acceptance, with no remaining material numerical
+or reproducibility blocker evident from the designated artifacts**. Kimi did not
+execute tests; actual execution remains lead/subagent tool evidence. Digital analytical
+Greeks and the separately labelled Black-76 quadrature check were also accepted.
+Final session export, student report approval, and the final submission tag remain
+open. The inherited `submission` tag points to `0a27070`, not the rebuilt project;
+it was inspected and preserved, not moved or deleted without authorization.

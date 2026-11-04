@@ -125,6 +125,10 @@ and volatility: \(\partial S_t/\partial S_0=S_t/S_0\) and
 Call payoff derivatives multiply these quantities (or their arithmetic mean) by
 the corresponding in-the-money indicator and discount factor. Vanilla benchmarks
 are \(\Delta=\Phi(d_1)\), \(\nu=S_0\phi(d_1)\sqrt T\).
+For the unit digital call the analytical references are
+\(\Delta_D=e^{-rT}\phi(d_2)/(S_0\sigma\sqrt T)\) and
+\(\nu_D=-e^{-rT}\phi(d_2)d_1/\sigma\), independently computed in the reference
+artifact and compared with all finite-difference bumps below.
 Central differences share random shocks, with spot bumps
 \(\{.1,.01,.001\}S_0\) and volatility bumps
 \(\{.1,.01,.001\}\sigma\); vega is per unit absolute volatility.
@@ -249,6 +253,15 @@ Independent-pilot coefficient beta: 1.031544394; A/G correlation 0.999680345. Pr
 
 At the 10% spot bump, absolute paired delta difference/SE values are 12.836 (vanilla) and 12.625 (Asian). Thus agreement must be assessed bump by bump rather than asserted universally. Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.
 
+| Digital Greek | Bump fraction | FD | Analytical | (FD-analytical)/SE |
+| --- | --- | --- | --- | --- |
+| delta | 0.001 | 0.00051132882 | 0.0005183591 | -0.32045528 |
+| delta | 0.01 | 0.00051416429 | 0.0005183591 | -0.61462963 |
+| delta | 0.1 | 0.00049802104 | 0.0005183591 | -12.122296 |
+| vega | 0.001 | -0.35505495 | -0.35116358 | -0.046501953 |
+| vega | 0.01 | -0.36491759 | -0.35116358 | -0.5130094 |
+| vega | 0.1 | -0.34045824 | -0.35116358 | 1.3150238 |
+
 ### Convergence
 
 | Estimator | RMSE slope | OLS slope SE | Bootstrap lower | Bootstrap upper | SE-versus-N slope |
@@ -326,7 +339,7 @@ Policies train on the daily grid. The 5/21-day results evaluate those same polic
 | f5_k0.001 | 37.392757 | 34.818548 | 40.181876 |
 | f5_k0.005 | 36.458432 | 32.939597 | 39.483282 |
 
-Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from this single training seed.
+Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from one fitted network per cost.
 
 Recorded approach wall times: A 61.236s, B 426.358s. Source figures: `results/approach1/if_main/{convergence,greeks,profiling}.html` and `results/approach2/if_main/{training,comparison,loss_histogram}.html`.
 
@@ -339,6 +352,8 @@ data snapshots are committed; regenerable results are ignored. Full reproduction
 must execute training rather than merely load checkpoints. The live session export
 must be refreshed after the final response. Submission tagging remains pending.
 Exact post-session export and submission steps are in `FINALIZE.md`.
+The inherited `submission` tag points to old commit `0a27070` and has deliberately
+not been moved; it is not evidence of acceptance of this independent rebuild.
 
 Full clean-clone reproduction executed from commit
 `4c6c8aff36aa8652be7214b9eda49b5c943dbf36`, with a clean source tree, a new virtual
@@ -381,8 +396,11 @@ does not establish optimization convergence.
 
 OpenAI established the shared mathematical conventions, independently retrieved and
 verified data, constructed quadrature references and infrastructure, and drafts this
-report. DeepSeek is assigned the numerical engines, estimator experiments and neural
-training. Kimi performs independent read-only review. Actual provider identifiers and
+report. DeepSeek implemented the numerical engines, estimator experiments and initial
+neural training code, then repaired confirmed pricing defects. OpenAI integrated the
+hedging precision/checkpoint repairs and executed full-size training, independent replay
+and clean-clone reproduction. Kimi performed independent read-only reviews of the data
+and integrated algorithms. Actual provider identifiers and
 child session IDs are recorded in RESEARCH_PROTOCOL.md and authentic session exports.
 The student group must review the assumptions, mathematical decisions, empirical
 verification and final English report; this draft is not a record of group approval.
