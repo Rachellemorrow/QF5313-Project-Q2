@@ -91,3 +91,21 @@ An already-running exploratory 50-epoch job predates these repairs. The separate
 full-size integrated run uses dataset label `if_main_verified`, so its results cannot
 be confused with the old smoke/full outputs. The evaluation-only checkpoint replay
 will apply the final precision corrections without changing trained weights.
+
+## Executed integration acceptance
+
+DeepSeek archived the initial Option A results and ran the repaired full experiment.
+The lead then executed the complete test collection. Its first run found 31 passing
+current tests and 17 failures in an unexpected untracked `tests/test_numerics.py`
+using incompatible `MarketParams` APIs. An additional untracked `tests 2/` directory
+also appeared. The user explicitly authorized preserving both paths under
+`.cache/unattributed-tests/`; neither was reused or deleted. Re-running the complete
+current suite gave **31 passed**. This earlier collection failure is not concealed.
+
+The full integrated B run completed with 131072/16384/16384 train/validation/test
+paths. All three cost-specific policies ran 20 epochs. Final float64 checkpoint
+evaluation and paired bootstrap completed successfully; `tools/verify_results.py
+--hedging-dataset if_main_verified` independently replayed all nine neural P&L
+combinations, CVaR, means, variances and costs successfully. It also verified training
+counts, finite histories, pricing validation and self-contained figures. Generated
+report/comparison tables use these verified metrics, not exploratory smoke outputs.

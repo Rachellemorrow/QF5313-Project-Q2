@@ -30,8 +30,8 @@ def main():
     lines.append(f"European BS reference: {val['european_bs']:.10f}; MC z-score: {val['z_score']:.6f}; criterion passed: {val['z_pass']}. Engines use identical shocks; their agreement checks arithmetic implementation, not independence of RNG libraries.")
     vr = am["variance_reduction"]
     lines += ["### Asian variance reduction",table(["Estimator","Price","SE","Variance of estimate","95% lower","95% upper"],[
-        [name,v["price"],v["se"],v["se"]**2,v["price"]-1.96*v["se"],v["price"]+1.96*v["se"]] for name,v in vr["asian"].items()]),
-        f"Independent-pilot coefficient beta: {vr['beta']:.9f}. Production path budgets are matched; pilot overhead is additional.",
+        [name,v["price"],v["se"],v["se"]**2,v["price"]-1.96*v["se"],v["price"]+1.96*v["se"]] for name,v in vr["asian"].items() if isinstance(v,dict)]),
+        f"Independent-pilot coefficient beta: {vr['beta']:.9f}; A/G correlation {vr['a_g_correlation']:.9f}. Production path budgets are matched; pilot overhead is {vr['pilot_paths']} additional paths ({vr['pilot_seconds']:.4f}s).",
         table(["Method","Variance reduction","Bootstrap lower","Bootstrap upper"],[[name,vr[key]["ratio"],vr[key]["ci_low"],vr[key]["ci_high"]] for name,key in [("Antithetic","vrr_antithetic"),("Control variate","vrr_cv")]])]
     g = am["greeks"]
     rows = []
@@ -41,11 +41,12 @@ def main():
             for bump,v in bumps.items():
                 rows.append([payoff,quantity,bump,v["estimate"],v["se"],pw.get("estimate","invalid pathwise"),pw.get("se","—")])
     lines += ["### Greeks",table(["Payoff","Greek","Fractional bump","FD","FD SE","Pathwise","Pathwise SE"],rows),
+              table(["Paired PW minus FD","Mean difference","Paired SE","Difference/SE"],[[k,v["mean_diff"],v["se"],v["mean_diff"]/v["se"] if v["se"] else "undefined"] for k,v in g["paired_diff"].items()]),
               "Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.",
-              "### Convergence",table(["Estimator","RMSE slope","OLS slope SE","SE-versus-N slope"],[
-                  [key,am["convergence"][f"slope_rmse_{key}"]["slope"],am["convergence"][f"slope_rmse_{key}"]["slope_se"],am["convergence"][f"slope_se_{key}"]["slope"]]
+              "### Convergence",table(["Estimator","RMSE slope","OLS slope SE","Bootstrap lower","Bootstrap upper","SE-versus-N slope"],[
+                  [key,am["convergence"][f"slope_rmse_{key}"]["slope"],am["convergence"][f"slope_rmse_{key}"]["slope_se"],am["convergence"][f"slope_rmse_{key}_bootstrap"]["ci_low"],am["convergence"][f"slope_rmse_{key}_bootstrap"]["ci_high"],am["convergence"][f"slope_se_{key}"]["slope"]]
                   for key in ("vanilla_naive","asian_naive","asian_anti","asian_cv")]),
-              f"Independent Asian reference: `{json.dumps(a['history']['ref'],sort_keys=True)}`. All reference uncertainty and observed departures are retained in the metrics."]
+              f"Independent Asian reference: `{json.dumps(a['history']['reference'],sort_keys=True)}`. Bootstrap slope intervals condition on this estimated reference and pilot; they do not integrate reference uncertainty. The original noisier reference produced a flat CV slope and is retained under `results/archive/initial_option_a`; the redesigned reference reduces, but does not eliminate, that uncertainty."]
     pr = am["profiling"]
     lines += ["### Profiling",table(["Loop seconds","NumPy seconds","Speedup","Loop peak bytes","NumPy peak bytes"],[[pr[k] for k in ("naive_loop_seconds","vectorized_seconds","speedup","naive_loop_peak_memory_bytes","vectorized_peak_memory_bytes")]]),
               "These are matched supplied-shock workloads. Memory values are traced allocations, not total process RSS. The raw hot-loop profile is stored in the metrics history. CPU contention can affect wall-clock measurements.",

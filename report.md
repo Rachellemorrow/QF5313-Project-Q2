@@ -1,6 +1,6 @@
 # Monte Carlo pricing and CVaR hedging calibrated to Chinese futures
 
-**English draft for student-group mathematical review. Experimental integration and final acceptance are pending.**
+**English draft for student-group mathematical review. Full experiments and independent replay have run; clean-clone reproduction and final acceptance are pending.**
 
 ## 1. Objective and interpretation
 
@@ -164,9 +164,164 @@ these quantify test-path uncertainty, not variability from retraining the model.
 
 ## 8. Results and independent audit
 
-Pending numerical implementation, full execution, integration checks and Kimi's
-final independent audit. No pricing, variance-reduction, convergence, speedup or
-neural-performance claim is made at this stage.
+<!-- GENERATED_RESULTS_START -->
+
+The following tables are generated from `results/approach1/if_main/metrics.json` and `results/approach2/if_main_verified/metrics.json`. Values are index-point payoffs/P&L; the digital pays one unit.
+
+### Executed pricing and validation
+
+| Payoff | NumPy price | SE | 95% lower | 95% upper | PyTorch price |
+| --- | --- | --- | --- | --- | --- |
+| asian | 188.5397 | 0.79075672 | 186.98981 | 190.08958 | 188.5397 |
+| barrier | 55.364736 | 0.38565681 | 54.608849 | 56.120623 | 55.364736 |
+| digital | 0.48586726 | 0.0013613426 | 0.48319903 | 0.48853549 | 0.48586726 |
+| european | 329.97462 | 1.4302484 | 327.17134 | 332.77791 | 329.97462 |
+
+European BS reference: 329.0776430123; MC z-score: 0.627151; criterion passed: True. Engines use identical shocks; their agreement checks arithmetic implementation, not independence of RNG libraries.
+
+### Asian variance reduction
+
+| Estimator | Price | SE | Variance of estimate | 95% lower | 95% upper |
+| --- | --- | --- | --- | --- | --- |
+| antithetic | 187.78394 | 0.58903504 | 0.34696227 | 186.62943 | 188.93844 |
+| control_variate | 187.89186 | 0.019935527 | 0.00039742525 | 187.85278 | 187.93093 |
+| naive | 187.60691 | 0.7883828 | 0.62154744 | 186.06168 | 189.15214 |
+
+Independent-pilot coefficient beta: 1.031544394; A/G correlation 0.999680345. Production path budgets are matched; pilot overhead is 16384 additional paths (0.0838s).
+
+| Method | Variance reduction | Bootstrap lower | Bootstrap upper |
+| --- | --- | --- | --- |
+| Antithetic | 1.7913978 | 1.755625 | 1.8280754 |
+| Control variate | 1563.9355 | 1520.8636 | 1607.499 |
+
+### Greeks
+
+| Payoff | Greek | Fractional bump | FD | FD SE | Pathwise | Pathwise SE |
+| --- | --- | --- | --- | --- | --- | --- |
+| asian | delta | 0.001 | 0.53878253 | 0.0014968085 | 0.53875382 | 0.0014998857 |
+| asian | delta | 0.01 | 0.53841263 | 0.0014697506 | 0.53875382 | 0.0014998857 |
+| asian | delta | 0.1 | 0.53034474 | 0.001176386 | 0.53875382 | 0.0014998857 |
+| asian | vega | 0.001 | 907.84191 | 4.3445256 | 907.84487 | 4.3445212 |
+| asian | vega | 0.01 | 907.83779 | 4.3445209 | 907.84487 | 4.3445212 |
+| asian | vega | 0.1 | 907.81291 | 4.3444716 | 907.84487 | 4.3445212 |
+| barrier | delta | 0.001 | -0.0010273044 | 0.010712753 | invalid pathwise | — |
+| barrier | delta | 0.01 | -0.0091585773 | 0.0034095292 | invalid pathwise | — |
+| barrier | delta | 0.1 | -0.0066953026 | 0.00063950748 | invalid pathwise | — |
+| barrier | vega | 0.001 | -577.83185 | 89.751207 | invalid pathwise | — |
+| barrier | vega | 0.01 | -530.94718 | 27.682497 | invalid pathwise | — |
+| barrier | vega | 0.1 | -556.47517 | 8.3146384 | invalid pathwise | — |
+| digital | delta | 0.001 | 0.00051132882 | 2.1938411e-05 | invalid pathwise | — |
+| digital | delta | 0.01 | 0.00051416429 | 6.8249471e-06 | invalid pathwise | — |
+| digital | delta | 0.1 | 0.00049802104 | 1.6777401e-06 | invalid pathwise | — |
+| digital | vega | 0.001 | -0.35505495 | 0.083681826 | invalid pathwise | — |
+| digital | vega | 0.01 | -0.36491759 | 0.026810436 | invalid pathwise | — |
+| digital | vega | 0.1 | -0.34045824 | 0.0081407919 | invalid pathwise | — |
+| european | delta | 0.001 | 0.56787016 | 0.0016145232 | 0.5679659 | 0.0016160987 |
+| european | delta | 0.01 | 0.56780407 | 0.0016002422 | 0.5679659 | 0.0016160987 |
+| european | delta | 0.1 | 0.56142402 | 0.0014440091 | 0.5679659 | 0.0016160987 |
+| european | vega | 0.001 | 1562.7005 | 8.0854666 | 1562.6918 | 8.0854865 |
+| european | vega | 0.01 | 1562.7234 | 8.085378 | 1562.6918 | 8.0854865 |
+| european | vega | 0.1 | 1562.6886 | 8.0852148 | 1562.6918 | 8.0854865 |
+
+| Paired PW minus FD | Mean difference | Paired SE | Difference/SE |
+| --- | --- | --- | --- |
+| asian_delta_h0.001 | -2.8706518e-05 | 6.6839153e-05 | -0.42948657 |
+| asian_delta_h0.01 | 0.00034118666 | 0.00020915945 | 1.6312276 |
+| asian_delta_h0.1 | 0.00840908 | 0.00066605013 | 12.625296 |
+| asian_vega_h0.001 | 0.0029532928 | 0.0021257535 | 1.3892922 |
+| asian_vega_h0.01 | 0.0070731765 | 0.00791959 | 0.89312408 |
+| asian_vega_h0.1 | 0.031953307 | 0.024675745 | 1.2949277 |
+| vanilla_delta_h0.001 | 9.5736625e-05 | 5.1592548e-05 | 1.8556289 |
+| vanilla_delta_h0.01 | 0.00016182885 | 0.00015541125 | 1.0412943 |
+| vanilla_delta_h0.1 | 0.0065418769 | 0.00050966005 | 12.835766 |
+| vanilla_vega_h0.001 | -0.0086934883 | 0.0060679512 | -1.4326892 |
+| vanilla_vega_h0.01 | -0.031646866 | 0.021756684 | -1.4545814 |
+| vanilla_vega_h0.1 | 0.0031177806 | 0.059401797 | 0.052486301 |
+
+Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.
+
+### Convergence
+
+| Estimator | RMSE slope | OLS slope SE | Bootstrap lower | Bootstrap upper | SE-versus-N slope |
+| --- | --- | --- | --- | --- | --- |
+| vanilla_naive | -0.52434448 | 0.033794341 | -0.5953035 | -0.46284215 | -0.49967175 |
+| asian_naive | -0.54901151 | 0.046514527 | -0.60536454 | -0.48312048 | -0.50059834 |
+| asian_anti | -0.4928473 | 0.02837916 | -0.55032679 | -0.43404393 | -0.50146489 |
+| asian_cv | -0.51292858 | 0.022532822 | -0.57810601 | -0.44086546 | -0.49732015 |
+
+Independent Asian reference: `{"antithetic": true, "beta": 1.0320540353027041, "method": "geometric control-variate (independent pilot beta, chunked antithetic production, distinct chunk seeds)", "n": 2097152, "n_pilot": 16384, "n_simulated_paths": 4194304, "price": 187.90663391055116, "se": 0.003498590570753974}`. Bootstrap slope intervals condition on this estimated reference and pilot; they do not integrate reference uncertainty. The original noisier reference produced a flat CV slope and is retained under `results/archive/initial_option_a`; the redesigned reference reduces, but does not eliminate, that uncertainty.
+
+### Profiling
+
+| Loop seconds | NumPy seconds | Speedup | Loop peak bytes | NumPy peak bytes |
+| --- | --- | --- | --- | --- |
+| 0.17263342 | 0.0075886168 | 22.748996 | 8096512 | 32352555 |
+
+These are matched supplied-shock workloads. Memory values are traced allocations, not total process RSS. The raw hot-loop profile is stored in the metrics history. CPU contention can affect wall-clock measurements.
+
+### Full-size neural training
+
+Architecture: [2, 32, 32, 1], SiLU hidden activations, unconstrained scalar output. Training paths: 131072; validation: 16384; test: 16384. Seeds: `{"initialization": [72, 73, 74], "test": 62, "train": 42, "validation": 52}`. Adam learning rates: weights 0.001, eta 1.0; batch size 2048; maximum epochs 20; validation patience 5; CPU threads 1.
+
+| Training cost | Epochs | Best validation CVaR | Restored eta |
+| --- | --- | --- | --- |
+| 0.0 | 20 | 402.849 | 393.25513 |
+| 0.001 | 20 | 422.00179 | 411.99515 |
+| 0.005 | 20 | 525.2261 | 515.07263 |
+
+Policies train on the daily grid. The 5/21-day results evaluate those same policies at fewer decision times; they are not separately optimized frequency-specific networks. Restored models minimize validation CVaR among observed epochs; convergence to the global CVaR optimum is not established.
+
+### All held-out frequency/cost benchmarks
+
+| Days | Cost | Policy | CVaR95 | Mean P&L | P&L variance | Mean cost | Turnover (units) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0 | BS | 346.7973 | -301.19415 | 565.81746 | 0 | 5.5961944 |
+| 1 | 0 | Neural | 402.12687 | -299.42217 | 14703.596 | 0 | 6.4519798 |
+| 1 | 0 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 1 | 0.001 | BS | 375.49166 | -323.39668 | 650.53601 | 22.202533 | 5.5961944 |
+| 1 | 0.001 | Neural | 421.32619 | -324.72748 | 7058.6419 | 23.568522 | 5.8893197 |
+| 1 | 0.001 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 1 | 0.005 | BS | 509.48447 | -412.20682 | 2118.0748 | 111.01267 | 5.5961944 |
+| 1 | 0.005 | Neural | 524.87472 | -404.18682 | 9456.3986 | 104.35372 | 5.1440906 |
+| 1 | 0.005 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 5 | 0 | BS | 387.91154 | -300.66865 | 1574.3012 | 0 | 2.8261092 |
+| 5 | 0 | Neural | 437.19559 | -299.25037 | 15269.47 | 0 | 3.1954183 |
+| 5 | 0 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 5 | 0.001 | BS | 402.68967 | -311.88286 | 1616.6152 | 11.2142 | 2.8261092 |
+| 5 | 0.001 | Neural | 440.08242 | -312.66623 | 7877.2423 | 11.725376 | 2.9314974 |
+| 5 | 0.001 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 5 | 0.005 | BS | 465.7312 | -356.73966 | 2012.1613 | 56.071002 | 2.8261092 |
+| 5 | 0.005 | Neural | 502.18964 | -352.8236 | 10730.237 | 53.142765 | 2.6264402 |
+| 5 | 0.005 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 21 | 0 | BS | 473.55041 | -300.75766 | 5600.503 | 0 | 1.6070304 |
+| 21 | 0 | Neural | 525.3505 | -299.46951 | 17576.002 | 0 | 1.7625975 |
+| 21 | 0 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 21 | 0.001 | BS | 481.74766 | -307.13436 | 5662.9586 | 6.3766981 | 1.6070304 |
+| 21 | 0.001 | Neural | 511.89303 | -307.66795 | 10958.943 | 6.5153507 | 1.6306682 |
+| 21 | 0.001 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+| 21 | 0.005 | BS | 514.93045 | -332.64115 | 5951.2701 | 31.883491 | 1.6070304 |
+| 21 | 0.005 | Neural | 545.03467 | -330.34811 | 13924.078 | 30.575493 | 1.5192124 |
+| 21 | 0.005 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
+
+### Paired bootstrap uncertainty
+
+| Combination | Observed neural minus BS CVaR | 95% lower | 95% upper |
+| --- | --- | --- | --- |
+| f1_k0.0 | 55.32957 | 54.232812 | 56.438022 |
+| f1_k0.001 | 45.834537 | 44.251592 | 47.344723 |
+| f1_k0.005 | 15.390245 | 12.981025 | 17.429697 |
+| f21_k0.0 | 51.800092 | 47.029582 | 57.043398 |
+| f21_k0.001 | 30.145367 | 25.613589 | 33.87183 |
+| f21_k0.005 | 30.104227 | 25.420468 | 35.072887 |
+| f5_k0.0 | 49.284053 | 46.62826 | 51.768726 |
+| f5_k0.001 | 37.392757 | 34.818548 | 40.181876 |
+| f5_k0.005 | 36.458432 | 32.939597 | 39.483282 |
+
+Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from this single training seed.
+
+Recorded approach wall times: A 61.236s, B 622.056s. Source figures: `results/approach1/if_main/{convergence,greeks,profiling}.html` and `results/approach2/if_main_verified/{training,comparison,loss_histogram}.html`.
+
+<!-- GENERATED_RESULTS_END -->
 
 ## 9. Reproducibility and limitations
 
