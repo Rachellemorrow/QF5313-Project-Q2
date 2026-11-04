@@ -4,7 +4,7 @@ import torch
 from scipy.optimize import minimize_scalar
 
 from mc_common import Model, gbm_paths_from_z_np, gbm_paths_from_z_torch, geometric_asian_price
-from approach2_hedging import empirical_cvar, hedging_pnl_np, hedging_pnl_torch, PolicyMLP, neural_delta
+from approach2_hedging import empirical_cvar, hedging_pnl_np, hedging_pnl_torch, PolicyMLP, neural_delta, evaluate_neural, _neural_losses
 
 
 def test_exact_path_identity_and_geometric_covariance():
@@ -61,3 +61,15 @@ def test_policy_causality_and_pnl_gradient():
     s = torch.tensor([[100.,101.,103.]],dtype=torch.float64)
     delta = torch.tensor([[.2,.4]],dtype=torch.float64,requires_grad=True)
     assert torch.autograd.gradcheck(lambda d: hedging_pnl_torch(s,d,np.array([0,1]),.001,short), (delta,), eps=1e-6,atol=1e-6)
+
+
+def test_table_and_bootstrap_share_exact_evaluation_losses():
+    model = Model()
+    paths = gbm_paths_from_z_np(model,np.random.default_rng(112).normal(size=(40,252)))
+    policy = PolicyMLP(8).double()
+    tensor = torch.tensor(paths)
+    table = evaluate_neural(model,policy,tensor,paths)
+    for freq in (1,5,21):
+        for cost in (0.,.001,.005):
+            losses = _neural_losses(model,policy,tensor,freq,cost,paths)
+            assert empirical_cvar(losses)[1] == table[str(freq)][str(cost)]["cvar95"]

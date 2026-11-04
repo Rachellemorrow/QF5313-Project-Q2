@@ -377,6 +377,8 @@ def paired_cvar_bootstrap(loss_a: np.ndarray, loss_b: np.ndarray, alpha: float,
         diffs[b] = cvb - cva
     return {
         "point_diff": float(empirical_cvar(loss_b, alpha)[1]-empirical_cvar(loss_a, alpha)[1]),
+        "n_boot": n_boot,
+        "seed": seed,
         "mean_diff": float(diffs.mean()),
         "ci_low": float(np.percentile(diffs, 2.5)),
         "ci_high": float(np.percentile(diffs, 97.5)),
@@ -459,6 +461,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--hidden", type=int, default=32)
     p.add_argument("--n-boot", type=int, default=400)
     p.add_argument("--threads", type=int, default=1, help="CPU threads; one avoids oversubscription for small MLPs")
+    p.add_argument("--evaluate-checkpoints", action="store_true", help="Replay persisted full-run policies without retraining; requires matching existing metrics")
     return p.parse_args()
 
 
@@ -466,6 +469,8 @@ def main() -> None:
     args = parse_args()
     if min(args.n_train, args.n_val, args.n_test, args.batch_size, args.epochs, args.patience, args.n_boot) <= 0:
         raise ValueError("Path counts and training settings must be positive")
+    if args.n_train < 2**17:
+        raise ValueError("Official runs require at least 131072 training paths; use unit tests for small checks")
     torch.set_num_threads(args.threads)
     model = mc.load_model()
     out_dir = results_dir("approach2", args.dataset)
@@ -486,16 +491,32 @@ def main() -> None:
 
     # ---- 1. datasets -------------------------------------------------------
     console.print("Simulating datasets ...")
-    S_train = torch.from_numpy(simulate_dataset(model, args.n_train, args.seed))
-    S_val = torch.from_numpy(simulate_dataset(model, args.n_val, args.seed + 10))
+    previous_metrics = None
+    if args.evaluate_checkpoints:
+        previous_metrics = json.loads((out_dir/"metrics.json").read_text())
+        for key in ("seed", "n_train", "n_val", "n_test", "hidden", "epochs", "patience"):
+            if previous_metrics["params"][key] != getattr(args,key):
+                raise ValueError(f"Checkpoint evaluation configuration differs: {key}")
+    else:
+        S_train = torch.from_numpy(simulate_dataset(model, args.n_train, args.seed))
+        S_val = torch.from_numpy(simulate_dataset(model, args.n_val, args.seed + 10))
     S_test_np = simulate_dataset(model, args.n_test, args.seed + 20, dtype=np.float64)
-    S_test = torch.from_numpy(S_test_np.astype(np.float32))
+    S_test = torch.from_numpy(S_test_np)
 
     # ---- 2. train cost-specific policies -----------------------------------
     trainings: Dict[float, dict] = {}
     for i, k in enumerate(COSTS):
         console.print(f"Training policy for kappa={k} ...")
-        res = train_policy(model, S_train, S_val, k, args.seed + 30 + i, args)
+        if args.evaluate_checkpoints:
+            saved = torch.load(out_dir/f"policy_k{k}.pt", map_location="cpu", weights_only=False)
+            policy = PolicyMLP(args.hidden)
+            policy.load_state_dict(saved["state_dict"])
+            res = {**previous_metrics["metrics"]["training"][str(k)],
+                   "history": previous_metrics["history"]["training_curves"][str(k)], "policy": policy}
+        else:
+            res = train_policy(model, S_train, S_val, k, args.seed + 30 + i, args)
+        res["policy"].double()
+        res["best_epoch"] = int(np.argmin(res["history"]["val_cvar"]))+1
         trainings[k] = res
         console.print(f"  kappa={k}: epochs={res['epochs_run']} "
                       f"best_val_cvar={res['best_val_cvar']:.4f} eta={res['best_eta']:.4f}")
@@ -518,6 +539,8 @@ def main() -> None:
         for k in COSTS:
             bs_loss = _bs_losses(model, S_test_np, f, k)
             nn_loss = _neural_losses(model, trainings[k]["policy"], S_test, f, k, S_test_np)
+            if not np.isclose(empirical_cvar(nn_loss)[1],neural[str(k)][str(f)][str(k)]["cvar95"],rtol=0,atol=1e-10):
+                raise ValueError("Table and bootstrap neural losses differ")
             bootstrap_cis[f"f{f}_k{k}"] = paired_cvar_bootstrap(
                 bs_loss, nn_loss, ALPHA, args.n_boot, args.seed + 1000 + f * 10 + int(k * 1000))
 
@@ -533,6 +556,8 @@ def main() -> None:
 
     # ---- 7. metrics --------------------------------------------------------
     fit_seconds = time.time() - t_start
+    if previous_metrics is not None:
+        fit_seconds += previous_metrics["fit_seconds"]
     metrics = {
         "engine_agreement": {
             "numpy": agree_np["european"]["price"],
@@ -560,7 +585,10 @@ def main() -> None:
     params["seeds"] = {"train": args.seed, "validation": args.seed+10, "test": args.seed+20,
                        "initialization": [args.seed+30+i for i in range(len(COSTS))]}
     params["meets_minimum_training_paths"] = args.n_train >= 2**17
-    params["numerics"] = "CPU float32 MLP/training, float64 test paths and common NumPy P&L for tables/bootstrap; CPU thread count recorded"
+    params["numerics"] = "CPU float32 training, float64 policy evaluation/test paths and common NumPy P&L for tables/bootstrap; CPU thread count recorded"
+    params["n_boot"] = args.n_boot
+    params["evaluation_from_checkpoints"] = args.evaluate_checkpoints
+    params["cost_sensitivity_limitation"] = "Cost-specific initialization seeds differ; effects are conditional on these fits and do not isolate cost from training randomness"
     params["architecture"] = [2, args.hidden, args.hidden, 1]
     params["accounting"] = "Assignment gains exp(r*(T-t)); costs unaccumulated; zero premium, initial holding zero, no terminal liquidation"
     write_metrics(out_dir / "metrics.json", params, metrics, fit_seconds, history)

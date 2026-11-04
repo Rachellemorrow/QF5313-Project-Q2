@@ -59,3 +59,35 @@ That child-only export is a test artifact, not final session-completeness eviden
 A separate fresh clone at `.cache/m1-offline-preflight` installed the frozen lock
 offline into a fresh virtual environment and passed the offline data checker and
 independent data test. This is **M1-only** evidence, not complete Option A/B reproduction.
+
+## Integrated numerical audit (Kimi, same child session)
+
+Kimi identified reference-limited CV convergence, overlapping convergence seeds,
+missing PW–FD paired uncertainty, silent calibration defaults and permissive NaN
+serialization. The lead independently confirmed these and delegated the Option A/
+shared-module repairs to DeepSeek. Original results are retained as exploratory
+evidence, not overwritten as if the first convergence experiment had passed.
+
+For Option B, Kimi confirmed table/bootstrap precision mismatch and absent saved
+checkpoints/gradient guards. Lead repairs now use a float64 copy of each trained
+policy and identical float64 paths/NumPy P&L for both tables and bootstrap, with an
+explicit equality check. Training remains float32. Checkpoints and histories are
+persisted; nonfinite loss/gradient and CVaR inputs fail explicitly; best epoch is
+recorded. Official entry points now reject fewer than 131072 training paths.
+Bootstrap output includes the observed difference, resample count and seed.
+
+Independent lead tests verify literal irregular-interval P&L, NumPy/Torch agreement,
+transaction cost sign, fractional CVaR against independently minimized RU objective,
+future-path perturbation causality, autograd finite differences, and exact equality
+of table/bootstrap evaluation metrics. Six integration/data tests passed after the
+repairs. Numerical full-run acceptance remains pending.
+
+**Accepted uncertainty limitation:** different cost-specific model initialization
+seeds mean the cross-cost neural sensitivity does not isolate costs from training
+randomness. Paired-path intervals are conditional on fitted policies, not retraining
+uncertainty. No claim of a causal cost effect or universal neural superiority is made.
+
+An already-running exploratory 50-epoch job predates these repairs. The separate
+full-size integrated run uses dataset label `if_main_verified`, so its results cannot
+be confused with the old smoke/full outputs. The evaluation-only checkpoint replay
+will apply the final precision corrections without changing trained weights.

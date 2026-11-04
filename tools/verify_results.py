@@ -34,13 +34,14 @@ def main():
     if b["params"]["seeds"]["test"] != seed+20:
         raise ValueError("Unrecognized test seed")
     prices = simulate_dataset(model,b["params"]["n_test"],seed+20,dtype=np.float64)
-    tensor = torch.tensor(prices,dtype=torch.float32)
+    tensor = torch.tensor(prices,dtype=torch.float64)
     torch.set_num_threads(1)
     replay = {}
     for cost in (0.,.001,.005):
         checkpoint = torch.load(base/f"policy_k{cost}.pt",weights_only=False,map_location="cpu")
         policy = PolicyMLP(checkpoint["hidden"])
         policy.load_state_dict(checkpoint["state_dict"])
+        policy.double()
         curve = b["history"]["training_curves"][str(cost)]
         if not curve["val_cvar"] or not np.isfinite(np.array(list(curve.values()))).all():
             raise ValueError("Invalid training history")
