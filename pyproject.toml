@@ -12,3 +12,4 @@ dependencies = [
 testpaths = ["tests"]
 python_files = ["test_*.py", "integration_*.py"]
 pythonpath = ["code"]
+addopts = "--basetemp=.cache/pytest-tmp"

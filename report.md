@@ -1,6 +1,6 @@
 # Monte Carlo pricing and CVaR hedging calibrated to Chinese futures
 
-**English draft for student-group mathematical review. Full experiments and independent replay have run; clean-clone reproduction and final acceptance are pending.**
+**English draft for student-group mathematical review. Full experiments, independent replay and clean-clone reproduction have passed; final session export and group approval remain pending.**
 
 ## 1. Objective and interpretation
 
@@ -89,6 +89,12 @@ The digital reference is 0.484891562413. The geometric-Asian quadrature referenc
 181.285332694516, independently agreeing with the discrete lognormal closed form.
 These are deterministic analytical checks, not Monte Carlo validation results.
 
+As a separately labelled model-convention check, the same initial level interpreted
+as a martingale futures price gives the Black-76 value 297.873559517241. Independent
+zero-drift lognormal quadrature agrees (`secondary_black76_zero_drift_*` fields in
+the reference artifact). This secondary calculation is not substituted for the
+assignment's drift-r Monte Carlo validation or hedging model.
+
 ## 4. Variance reduction and uncertainty
 
 Naive standard errors use independent discounted payoffs. For antithetic sampling,
@@ -136,7 +142,10 @@ Finite-difference truncation bias similarly need not disappear by increasing pat
 The Python-loop and vectorized implementations are benchmarked at matched workloads
 using repeated timings and an actual hot-loop profile. Vectorization requires
 path-by-time arrays and temporaries; speedup is not interpreted as a memory saving.
-Timing results and hardware/runtime details will be inserted after execution.
+The recorded environment is macOS 26.6.2 on arm64, with 10 logical CPU cores,
+Python 3.13.13, NumPy 2.2.6 and PyTorch 2.7.1 (`results/environment.json`). The
+integrated hedging run uses one CPU thread and does not use the available MPS device.
+Executed timing and memory results appear below; they are machine-specific.
 
 ## 7. Deep hedging and CVaR
 
@@ -166,7 +175,7 @@ these quantify test-path uncertainty, not variability from retraining the model.
 
 <!-- GENERATED_RESULTS_START -->
 
-The following tables are generated from `results/approach1/if_main/metrics.json` and `results/approach2/if_main_verified/metrics.json`. Values are index-point payoffs/P&L; the digital pays one unit.
+The following tables are generated from `results/approach1/if_main/metrics.json` and `results/approach2/if_main/metrics.json`. Values are index-point payoffs/P&L; the digital pays one unit.
 
 ### Executed pricing and validation
 
@@ -238,7 +247,7 @@ Independent-pilot coefficient beta: 1.031544394; A/G correlation 0.999680345. Pr
 | vanilla_vega_h0.01 | -0.031646866 | 0.021756684 | -1.4545814 |
 | vanilla_vega_h0.1 | 0.0031177806 | 0.059401797 | 0.052486301 |
 
-Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.
+At the 10% spot bump, absolute paired delta difference/SE values are 12.836 (vanilla) and 12.625 (Asian). Thus agreement must be assessed bump by bump rather than asserted universally. Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.
 
 ### Convergence
 
@@ -319,7 +328,7 @@ Policies train on the daily grid. The 5/21-day results evaluate those same polic
 
 Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from this single training seed.
 
-Recorded approach wall times: A 61.236s, B 622.056s. Source figures: `results/approach1/if_main/{convergence,greeks,profiling}.html` and `results/approach2/if_main_verified/{training,comparison,loss_histogram}.html`.
+Recorded approach wall times: A 61.236s, B 426.358s. Source figures: `results/approach1/if_main/{convergence,greeks,profiling}.html` and `results/approach2/if_main/{training,comparison,loss_histogram}.html`.
 
 <!-- GENERATED_RESULTS_END -->
 
@@ -329,11 +338,44 @@ See the ten-line README for frozen installation and offline execution. The sourc
 data snapshots are committed; regenerable results are ignored. Full reproduction
 must execute training rather than merely load checkpoints. The live session export
 must be refreshed after the final response. Submission tagging remains pending.
+Exact post-session export and submission steps are in `FINALIZE.md`.
+
+Full clean-clone reproduction executed from commit
+`4c6c8aff36aa8652be7214b9eda49b5c943dbf36`, with a clean source tree, a new virtual
+environment and `uv sync --frozen --offline`. The Python/uv package cache was already
+populated inside the original repository; this is not a claim of cold-machine
+offline package installation. No live market-data retrieval was required.
+All eight pipeline stages returned zero, including full neural retraining (about
+427.5 seconds for the B process), independent held-out replay and comparison output.
+Evidence is in `results/clean_clone/20261104T090738342929/evidence.json` and the clone's
+timestamped `results/reproduction/` manifest. Across original and reproduced runs,
+325 pricing numerical fields and 631 hedging/history numerical fields agreed within
+the explicitly checked tolerances; timing fields were not treated as deterministic.
+The numerical source files and lockfile hashes were identical. The reproduced B
+artifacts were promoted to the canonical `results/approach2/if_main/` location after
+archiving the earlier exploratory full run. `results/reproduction_comparison.json`
+records these comparisons. Later local-pytest configuration/report edits do not
+change those numerical source files or dependencies.
+
+An earlier all-tests run encountered 17 failures from unexpected untracked tests
+using a different API. With explicit user authorization, those files were preserved
+under `.cache/unattributed-tests/` without reuse; the current independent suite then
+passed all 31 tests. Earlier direct pytest runs did not explicitly set a local
+temporary base directory; their write-locality compliance is therefore not verified.
+The configuration now enforces `.cache/pytest-tmp`. This historical uncertainty is
+retained rather than represented as a clean compliance pass.
 
 Limitations include continuous-contract roll contamination, constant volatility,
 the spot-versus-futures convention, simplified cash-flow timing, model-implied rather
 than physical loss tails, discrete barrier monitoring, and single-seed training
 variability unless additional full independent fits are actually executed.
+In this executed 20-epoch experiment, all nine matched neural-minus-BS CVaR point
+differences are positive, and all nine marginal paired-bootstrap intervals exclude
+zero on the positive side. Thus these particular trained policies underperform the
+BS benchmark on held-out CVaR. This finding is conditional on the model, architecture,
+training budget and single set of fitted networks; it is not a general impossibility
+result for deep hedging. All policies reached the 20-epoch budget, so the experiment
+does not establish optimization convergence.
 
 ## 10. Statement of work
 

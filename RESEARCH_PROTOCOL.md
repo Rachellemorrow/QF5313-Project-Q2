@@ -37,7 +37,8 @@ uncertainty. No neural outperformance is presumed.
 
 Lead owns data, dependencies, comparison, independent integration checks and report.
 DeepSeek owns mc_common.py, approach1_pricing.py, approach2_hedging.py and its tests.
-All outputs are newly executed; audit and final acceptance are pending.
+All outputs are newly executed. Numerical repairs, independent replay and full
+clean-clone reproduction have completed; final session/group acceptance remains pending.
 
 ## Integration protocol update
 

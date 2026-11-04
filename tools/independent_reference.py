@@ -35,10 +35,18 @@ def calculate():
     tail_bound = float(s*ndtr(v*np.sqrt(T)-12))
     if tail_bound >= 1e-9:
         raise ValueError("Quadrature tail exceeds tolerance; increase integration limit")
+    black_d1 = (np.log(s/k)+v*v*T/2)/(v*np.sqrt(T))
+    black76 = disc*(s*ndtr(black_d1)-k*ndtr(black_d1-v*np.sqrt(T)))
+    black_z = (np.log(k/s)+v*v*T/2)/(v*np.sqrt(T))
+    black_quad, _ = quad(lambda z: disc*(s*np.exp(-v*v*T/2+v*np.sqrt(T)*z)-k)*density(z),black_z,12)
+    if abs(black76-black_quad) >= 1e-8:
+        raise ValueError("Secondary Black-76 deterministic validation failed")
     return {"params": p, "metrics": {"bs_call": float(bs), "call_quadrature": quadrature,
         "quadrature_finite_interval_error_estimate": error, "bs_delta": float(ndtr(d1)),
         "bs_vega": float(s*np.sqrt(T)*density(d1)), "digital": float(disc*ndtr(d2)),
         "vanilla_quadrature_tail_upper_bound": tail_bound,
+        "secondary_black76_zero_drift_call": float(black76),
+        "secondary_black76_zero_drift_quadrature": float(black_quad),
         "geometric_asian_quadrature": geo, "geometric_quadrature_finite_interval_error_estimate": geo_error,
         "geometric_log_variance_from_covariance_matrix": float(varlog),
         "geometric_asian_closed_form": float(geometric_closed),

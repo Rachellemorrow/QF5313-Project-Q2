@@ -109,3 +109,26 @@ evaluation and paired bootstrap completed successfully; `tools/verify_results.py
 combinations, CVaR, means, variances and costs successfully. It also verified training
 counts, finite histories, pricing validation and self-contained figures. Generated
 report/comparison tables use these verified metrics, not exploratory smoke outputs.
+
+## Temporary-file hygiene correction
+
+Final infrastructure inspection found that direct pytest invocations had no explicit
+`--basetemp`, while several new tests use `tmp_path`. Those earlier direct runs may
+therefore have used pytest's system temporary directory, contrary to the repository
+write-locality contract. This cannot be retroactively marked compliant. Pytest now
+sets `--basetemp=.cache/pytest-tmp` in pyproject.toml for all subsequent direct runs.
+The full clean-clone driver already sets TMPDIR to the clone's `.cache/tmp` before
+tests, so that run's temporary artifacts are repository-local. No external files
+were deleted to conceal or repair the earlier risk.
+
+## Full clean-clone reproduction
+
+The clean-clone run from clean commit `4c6c8af` returned PASS, with frozen offline
+dependency installation into a new venv and all eight reproduction stages returning
+zero. Full B training ran again rather than loading checkpoints. Evidence lives in
+`results/clean_clone/20261104T090738342929/evidence.json`. Lead compared 325 pricing
+numeric fields and 631 hedging/history numeric fields across runs with no discrepancies
+at tolerances 1e-11 and 1e-10 respectively (timing excluded). Numerical source and
+lockfile hashes match. The canonical B outputs now come from this independently
+reproduced run; prior exploratory output was preserved in results/archive/.
+The canonical output checker and comparison/report generators then passed again.

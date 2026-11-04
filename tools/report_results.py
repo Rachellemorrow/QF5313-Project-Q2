@@ -42,7 +42,7 @@ def main():
                 rows.append([payoff,quantity,bump,v["estimate"],v["se"],pw.get("estimate","invalid pathwise"),pw.get("se","—")])
     lines += ["### Greeks",table(["Payoff","Greek","Fractional bump","FD","FD SE","Pathwise","Pathwise SE"],rows),
               table(["Paired PW minus FD","Mean difference","Paired SE","Difference/SE"],[[k,v["mean_diff"],v["se"],v["mean_diff"]/v["se"] if v["se"] else "undefined"] for k,v in g["paired_diff"].items()]),
-              "Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.",
+              f"At the 10% spot bump, absolute paired delta difference/SE values are {abs(g['paired_diff']['vanilla_delta_h0.1']['mean_diff']/g['paired_diff']['vanilla_delta_h0.1']['se']):.3f} (vanilla) and {abs(g['paired_diff']['asian_delta_h0.1']['mean_diff']/g['paired_diff']['asian_delta_h0.1']['se']):.3f} (Asian). Thus agreement must be assessed bump by bump rather than asserted universally. Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.",
               "### Convergence",table(["Estimator","RMSE slope","OLS slope SE","Bootstrap lower","Bootstrap upper","SE-versus-N slope"],[
                   [key,am["convergence"][f"slope_rmse_{key}"]["slope"],am["convergence"][f"slope_rmse_{key}"]["slope_se"],am["convergence"][f"slope_rmse_{key}_bootstrap"]["ci_low"],am["convergence"][f"slope_rmse_{key}_bootstrap"]["ci_high"],am["convergence"][f"slope_se_{key}"]["slope"]]
                   for key in ("vanilla_naive","asian_naive","asian_anti","asian_cv")]),
