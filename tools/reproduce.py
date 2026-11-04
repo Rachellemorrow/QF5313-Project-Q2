@@ -29,6 +29,7 @@ def main():
         [sys.executable, "tools/data_diagnostics.py"],
         [sys.executable, "code/approach1_pricing.py", "--seed", str(args.seed)],
         [sys.executable, "code/approach2_hedging.py", "--seed", str(args.seed)],
+        [sys.executable, "tools/verify_results.py"],
         [sys.executable, "code/compare.py"],
     ]
     started_at = time.time()

@@ -38,3 +38,15 @@ uncertainty. No neural outperformance is presumed.
 Lead owns data, dependencies, comparison, independent integration checks and report.
 DeepSeek owns mc_common.py, approach1_pricing.py, approach2_hedging.py and its tests.
 All outputs are newly executed; audit and final acceptance are pending.
+
+## Integration protocol update
+
+Initial Option A results exposed a high-noise Asian reference that obscured CV
+RMSE convergence; DeepSeek is repairing the reference and repetition seeds before
+acceptance. The initial Option B full job (50 epochs, 8 CPU threads) is retained
+as an exploratory run. The integrated reproducible default uses 20 maximum epochs,
+five-epoch validation patience, and one CPU thread, retaining all 131072 training
+paths, 16384 validation/test paths, and the same unmodified RU objective. This
+computational budget is fixed before inspecting integrated held-out outcomes;
+nonconvergence and training variability must be disclosed. Checkpoints, full curves,
+finite-gradient checks and matched float64 test accounting are now mandatory.
