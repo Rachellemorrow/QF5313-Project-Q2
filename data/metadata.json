@@ -1,62 +1,157 @@
 {
-  "retrieved_utc": "2026-11-03T17:21:11.687062+00:00",
-  "akshare_version": "1.17.85",
-  "cutoff": "2026-11-03",
+  "retrieved_at_utc": "2026-11-04T01:10:07.763723+00:00",
   "artifacts": {
-    "if_main.csv": {
-      "sha256": "ac7f562fcf7aec443972aedbaf7758a4880c114f4644831dd37ee6be127d6aa6",
-      "source": "ak.futures_main_sina(IF0)",
-      "url": "https://finance.sina.com.cn/futures/quotes/IF0.shtml",
-      "schema": {
-        "date": "object",
-        "close": "float64"
-      },
-      "rows": 2375,
-      "start": "2017-01-17",
+    "data/clean/if_main.csv": {
+      "sha256": "7e0eccecb23f69dcccaf4df873d14453ce3e8748399fd4c0cf3f0d99f79aa98c",
+      "source": "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/InnerFuturesNewService.getDailyKLine?symbol=IF0",
+      "rows": 1899,
+      "start": "2019-01-02",
       "end": "2026-11-03",
-      "missing_cells": 0,
-      "weekday_dates_without_observation": 181,
-      "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."
+      "schema": {
+        "date": "ISO date",
+        "close": "index points"
+      },
+      "duplicates": 0,
+      "missing_values": 0
     },
-    "csi300_index.csv": {
-      "sha256": "2aa669e1b053052237c2295111d0aec43aa9da16c4d2571f125d1bc981a9ea84",
-      "source": "ak.stock_zh_index_daily(sh000300)",
-      "url": "https://finance.sina.com.cn/realstock/company/sh000300/nc.shtml",
-      "schema": {
-        "date": "object",
-        "close": "float64"
-      },
-      "rows": 2386,
-      "start": "2017-01-03",
+    "data/clean/csi300_index.csv": {
+      "sha256": "65d5cb1cfd287efc58850c162ed8105bc797a08be0dcf91569ad5544d1eec090",
+      "source": "ak.index_zh_a_hist(000300): Eastmoney",
+      "rows": 1899,
+      "start": "2019-01-02",
       "end": "2026-11-03",
-      "missing_cells": 0,
-      "weekday_dates_without_observation": 180,
-      "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."
+      "schema": {
+        "date": "ISO date",
+        "close": "index points"
+      },
+      "duplicates": 0,
+      "missing_values": 0
     },
-    "shibor.csv": {
-      "sha256": "3e1f71778c7791420476c123a5068d85c7d831e2f982dd2cbfe15d77d269a5a6",
-      "source": "ak.macro_china_shibor_all()",
-      "url": "https://cdn.jin10.com/data_center/reports/il_1.json",
-      "schema": {
-        "date": "object",
-        "O/N": "float64",
-        "1W": "float64",
-        "2W": "float64",
-        "1M": "float64",
-        "3M": "float64",
-        "6M": "float64",
-        "9M": "float64",
-        "1Y": "float64"
-      },
-      "rows": 2396,
-      "start": "2017-03-17",
+    "data/clean/shibor.csv": {
+      "sha256": "c629d6d8a4a5e1d65577d627118a8c1b766216adfe459ce25d0a31a083ae8366",
+      "source": "ak.macro_china_shibor_all: https://cdn.jin10.com/data_center/reports/il_1.json",
+      "rows": 1947,
+      "start": "2019-01-02",
       "end": "2026-11-03",
-      "missing_cells": 0,
-      "weekday_dates_without_observation": 174,
-      "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."
+      "schema": {
+        "date": "ISO date",
+        "O/N": "percent per annum",
+        "1W": "percent per annum",
+        "2W": "percent per annum",
+        "1M": "percent per annum",
+        "3M": "percent per annum",
+        "6M": "percent per annum",
+        "9M": "percent per annum",
+        "1Y": "percent per annum"
+      },
+      "duplicates": 0,
+      "missing_values": 0
+    },
+    "data/clean/calibration.json": {
+      "sha256": "8d1f06704539a2de21e7381711596db41ef8f604944830608b245fa496dca458",
+      "source": "derived by data/fetch.py from verified snapshots",
+      "schema": "spot/strike/barrier in index points; r,sigma,mu annual decimal; T years; steps integer"
     }
   },
-  "futures_series": "Sina IF0 vendor main continuous series; not individual deliverable contracts. No roll adjustment applied. Vendor snapshot has no constituent contract identifier, so precise roll dates and roll jumps cannot be independently identified. Large changes are flagged, never silently removed.",
-  "index_source_note": "Sina AKShare index endpoint used instead of Eastmoney index_zh_a_hist; same CSI300 underlying.",
-  "rate_convention": "SHIBOR percentage deposit rates, ACT/360 simple quotes; zero=log1p(quote*tenor)/tenor; linear interpolation in continuous zero rates. 1Y=360/360; no extrapolation."
+  "calibration": {
+    "window_start": "2020-11-03",
+    "window_end": "2026-11-03",
+    "observations": 1455,
+    "log_return_count": 1454,
+    "annual_log_drift": -0.030953175072438038,
+    "annual_log_drift_se": 0.07936885630994275,
+    "mu": -0.012779861735666437,
+    "sigma": 0.1906479128486415,
+    "rate_date": "2026-11-03",
+    "zero_curve": {
+      "O/N": 0.012890772364426834,
+      "1W": 0.013418273344472223,
+      "2W": 0.013676412222650378,
+      "1M": 0.01379506763184661,
+      "3M": 0.013990504672203153,
+      "6M": 0.014149827343923758,
+      "9M": 0.014222870776847453,
+      "1Y": 0.01428744660806955
+    },
+    "missing_weekdays_including_exchange_holidays": 111,
+    "missing_index_trading_dates": [],
+    "largest_absolute_daily_log_return": 0.10556324086450353,
+    "largest_basis_changes": [
+      {
+        "date": "2024-10-08T00:00:00.000",
+        "close_f": 4261.2,
+        "close_i": 4256.1,
+        "basis": 5.1,
+        "basis_change": -137.65
+      },
+      {
+        "date": "2025-04-07T00:00:00.000",
+        "close_f": 3452.6,
+        "close_i": 3589.44,
+        "basis": -136.84,
+        "basis_change": -112.34
+      },
+      {
+        "date": "2026-06-11T00:00:00.000",
+        "close_f": 4591.8,
+        "close_i": 4722.41,
+        "basis": -130.61,
+        "basis_change": -103.42
+      },
+      {
+        "date": "2026-09-11T00:00:00.000",
+        "close_f": 4410.2,
+        "close_i": 4510.16,
+        "basis": -99.96,
+        "basis_change": -93.77
+      },
+      {
+        "date": "2024-09-27T00:00:00.000",
+        "close_f": 3827.8,
+        "close_i": 3703.68,
+        "basis": 124.12,
+        "basis_change": 81.44
+      },
+      {
+        "date": "2025-06-17T00:00:00.000",
+        "close_f": 3799.2,
+        "close_i": 3870.38,
+        "basis": -71.18,
+        "basis_change": -67.18
+      },
+      {
+        "date": "2022-07-18T00:00:00.000",
+        "close_f": 4273.0,
+        "close_i": 4292.59,
+        "basis": -19.59,
+        "basis_change": -57.06
+      },
+      {
+        "date": "2026-03-13T00:00:00.000",
+        "close_f": 4583.6,
+        "close_i": 4669.14,
+        "basis": -85.54,
+        "basis_change": -56.38
+      },
+      {
+        "date": "2021-03-22T00:00:00.000",
+        "close_f": 5000.6,
+        "close_i": 5057.15,
+        "basis": -56.55,
+        "basis_change": -55.46
+      },
+      {
+        "date": "2022-07-15T00:00:00.000",
+        "close_f": 4286.0,
+        "close_i": 4248.53,
+        "basis": 37.47,
+        "basis_change": 49.54
+      }
+    ],
+    "roll_policy": "Sina IF0 main continuous as published, no back adjustment applied. Constituent/roll flags unavailable; basis-change diagnostics cannot identify every roll or separate genuine moves. Volatility includes possible roll jumps.",
+    "rate_convention": "SHIBOR percent deposit quotes approximated as simple ACT/365 rates; continuously compounded zero yields log(1+q*t)/t linearly interpolated. Not a bootstrapped tradable zero curve."
+  },
+  "retrieval_failures": [
+    "Initial CffexFuturesService.getCffexFuturesDailyKLine IF0 trial returned only 588 records for 2019-2024 and failed coverage validation; replaced with assignment-prescribed futures_main_sina, newly retrieved."
+  ]
 }

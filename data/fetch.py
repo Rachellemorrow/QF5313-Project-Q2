@@ -1,135 +1,145 @@
-"""Fresh AKShare retrieval, checksum-verified offline replay and calibration.
+"""Retrieve public observations or verify the committed offline snapshot.
 
-Remote: uv run python data/fetch.py --fetch
-Offline: uv run python data/fetch.py --offline
-SHIBOR deposit quotes converted to continuous zero rates using ACT/360.
+Live: UV_CACHE_DIR=.cache/uv uv run python data/fetch.py --live
+Offline: UV_CACHE_DIR=.cache/uv uv run python data/fetch.py --offline
 """
-from __future__ import annotations
-
 import argparse
 import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import akshare as ak
 import numpy as np
 import pandas as pd
+import requests
 from rich.console import Console
 
 ROOT = Path(__file__).resolve().parents[1]
 CLEAN = ROOT / "data/clean"
 META = ROOT / "data/metadata.json"
-TENORS = {"O/N": 1, "1W": 7, "2W": 14, "1M": 30, "3M": 90,
-          "6M": 180, "9M": 270, "1Y": 360}
+TENORS = {"O/N": 1/365, "1W": 7/365, "2W": 14/365, "1M": 1/12,
+          "3M": .25, "6M": .5, "9M": .75, "1Y": 1.0}
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def normalize(frame, names):
-    frame = frame.rename(columns=names)
-    frame["date"] = pd.to_datetime(frame["date"]).dt.strftime("%Y-%m-%d")
-    return frame.sort_values("date").reset_index(drop=True)
+def validate(frame, name):
+    frame = frame.copy()
+    frame["date"] = pd.to_datetime(frame.date)
+    if frame.date.duplicated().any() or frame.date.isna().any():
+        raise ValueError(f"{name}: duplicate or invalid date")
+    frame = frame.sort_values("date").reset_index(drop=True)
+    values = frame.drop(columns="date").apply(pd.to_numeric, errors="raise")
+    if not np.isfinite(values.to_numpy()).all():
+        raise ValueError(f"{name}: missing/nonfinite observations")
+    if "close" in values and (values.close <= 0).any():
+        raise ValueError("Nonpositive price")
+    frame[values.columns] = values
+    return frame
 
 
-def inspect(frame, value):
-    dates = pd.to_datetime(frame.date)
-    if dates.duplicated().any() or not dates.is_monotonic_increasing:
-        raise ValueError("Duplicate or unsorted dates")
-    values = pd.to_numeric(frame[value], errors="raise")
-    if not np.isfinite(values).all() or (values <= 0).any():
-        raise ValueError(f"Invalid {value}")
-    return {"rows": len(frame), "start": frame.date.iloc[0], "end": frame.date.iloc[-1],
-            "missing_cells": int(frame.isna().sum().sum()),
-            "weekday_dates_without_observation": int(len(pd.bdate_range(dates.min(), dates.max()).difference(dates))),
-            "missing_date_note": "Weekday gaps include exchange holidays; no forward fill; not a trading-calendar audit."}
+def calibrate(futures, index, rates):
+    cutoff = min(futures.date.max(), index.date.max(), rates.date.max())
+    f = futures[futures.date <= cutoff].copy()
+    start = cutoff - pd.DateOffset(years=6)
+    f = f[f.date >= start]
+    if (f.date.max() - f.date.min()).days < 5*365 or len(f) < 1000:
+        raise ValueError("Insufficient five-year futures history")
+    ret = np.diff(np.log(f.close.to_numpy()))
+    sigma = float(np.std(ret, ddof=1)*np.sqrt(252))
+    mu = float(np.mean(ret)*252 + .5*sigma*sigma)
+    curve = rates[rates.date <= cutoff].iloc[-1]
+    times = np.array(list(TENORS.values()))
+    quotes = np.array([curve[t] for t in TENORS])/100
+    # Deposit-rate approximation: D(t)=1/(1+q(t)*t), interpolate zero yields.
+    zeros = np.log1p(quotes*times)/times
+    r = float(np.interp(1.0, times, zeros))
+    s0 = float(f.close.iloc[-1])
+    aligned = f[["date", "close"]].merge(index[["date", "close"]], on="date", suffixes=("_f", "_i"))
+    aligned["basis"] = aligned.close_f-aligned.close_i
+    aligned["basis_change"] = aligned.basis.diff()
+    jumps = aligned.loc[aligned.basis_change.abs().nlargest(10).index]
+    quality = {
+        "window_start": str(f.date.min().date()), "window_end": str(f.date.max().date()),
+        "observations": len(f), "log_return_count": len(ret),
+        "annual_log_drift": float(ret.mean()*252), "annual_log_drift_se": float(sigma*np.sqrt(252/len(ret))),
+        "mu": mu, "sigma": sigma, "rate_date": str(curve.date.date()),
+        "zero_curve": dict(zip(TENORS, zeros.tolist())),
+        "missing_weekdays_including_exchange_holidays": len(pd.bdate_range(f.date.min(), f.date.max()).difference(f.date)),
+        "missing_index_trading_dates": [str(x.date()) for x in index[(index.date >= f.date.min()) & (index.date <= f.date.max())].date if x not in set(f.date)],
+        "largest_absolute_daily_log_return": float(abs(ret).max()),
+        "largest_basis_changes": json.loads(jumps.to_json(orient="records", date_format="iso")),
+        "roll_policy": "Sina IF0 main continuous as published, no back adjustment applied. Constituent/roll flags unavailable; basis-change diagnostics cannot identify every roll or separate genuine moves. Volatility includes possible roll jumps.",
+        "rate_convention": "SHIBOR percent deposit quotes approximated as simple ACT/365 rates; continuously compounded zero yields log(1+q*t)/t linearly interpolated. Not a bootstrapped tradable zero curve.",
+    }
+    return dict(S0=s0, K=s0, B=1.2*s0, r=r, sigma=sigma, mu=mu, T=1., steps=252), quality
 
 
-def acquire():
-    import akshare as ak
+def live():
     CLEAN.mkdir(parents=True, exist_ok=True)
     raw = ROOT / "data/raw"
-    raw.mkdir(exist_ok=True)
-    # Fixed historical cutoff for a reproducible estimator, freshly retrieved.
-    end = "2026-11-03"
-    futures = ak.futures_main_sina(symbol="IF0", start_date="20170101", end_date="20261103")
-    futures.to_csv(raw / "if_fresh.csv", index=False)
-    futures = normalize(futures, {"日期": "date", "收盘价": "close"})
-    index = ak.stock_zh_index_daily(symbol="sh000300")
-    index.to_csv(raw / "index_fresh.csv", index=False)
-    index = normalize(index, {})
-    shibor = ak.macro_china_shibor_all()
-    shibor.to_csv(raw / "shibor_fresh.csv", index=False)
-    shibor = normalize(shibor, {"日期": "date", **{f"{t}-定价": t for t in TENORS}})
-    datasets = {
-        "if_main.csv": (futures, ["date", "close"], "ak.futures_main_sina(IF0)", "https://finance.sina.com.cn/futures/quotes/IF0.shtml"),
-        "csi300_index.csv": (index, ["date", "close"], "ak.stock_zh_index_daily(sh000300)", "https://finance.sina.com.cn/realstock/company/sh000300/nc.shtml"),
-        "shibor.csv": (shibor, ["date", *TENORS], "ak.macro_china_shibor_all()", "https://cdn.jin10.com/data_center/reports/il_1.json"),
-    }
+    raw.mkdir(parents=True, exist_ok=True)
+    url = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/InnerFuturesNewService.getDailyKLine"
+    f = ak.futures_main_sina(symbol="IF0", start_date="20190101", end_date="20261104")
+    f.to_csv(raw / "if_main_akshare.csv", index=False)
+    futures = validate(f.rename(columns={"日期": "date", "收盘价": "close"})[["date", "close"]], "IF0")
+    errors = ["Initial CffexFuturesService.getCffexFuturesDailyKLine IF0 trial returned only 588 records for 2019-2024 and failed coverage validation; replaced with assignment-prescribed futures_main_sina, newly retrieved."]
+    try:
+        i = ak.index_zh_a_hist(symbol="000300", start_date="20190101", end_date="20261104")
+        index = validate(i.rename(columns={"日期": "date", "收盘": "close"})[["date", "close"]], "CSI300")
+        index_source = "ak.index_zh_a_hist(000300): Eastmoney"
+    except Exception as exc:
+        errors.append(f"index_zh_a_hist: {type(exc).__name__}: {exc}")
+        i = ak.stock_zh_index_daily(symbol="sh000300")
+        index = validate(i[["date", "close"]], "CSI300")
+        index_source = "ak.stock_zh_index_daily(sh000300): Sina"
+    s = ak.macro_china_shibor_all()
+    rates = validate(s.rename(columns={"日期": "date", **{t+"-定价": t for t in TENORS}})[["date", *TENORS]], "SHIBOR")
+    frames = {"if_main": futures, "csi300_index": index, "shibor": rates}
+    sources = {"if_main": url+"?symbol=IF0", "csi300_index": index_source,
+               "shibor": "ak.macro_china_shibor_all: https://cdn.jin10.com/data_center/reports/il_1.json"}
     artifacts = {}
-    for name, (frame, columns, source, url) in datasets.items():
-        frame = frame.loc[(frame.date >= "2017-01-01") & (frame.date <= end), columns]
-        stats = inspect(frame, "1Y" if name == "shibor.csv" else "close")
-        frame.to_csv(CLEAN / name, index=False, float_format="%.12g")
-        artifacts[name] = {"sha256": digest(CLEAN / name), "source": source, "url": url,
-                           "schema": {c: str(frame[c].dtype) for c in columns}, **stats}
-    META.write_text(json.dumps({"retrieved_utc": datetime.now(timezone.utc).isoformat(),
-        "akshare_version": ak.__version__, "cutoff": end, "artifacts": artifacts,
-        "futures_series": "Sina IF0 vendor main continuous series; not individual deliverable contracts. No roll adjustment applied. Vendor snapshot has no constituent contract identifier, so precise roll dates and roll jumps cannot be independently identified. Large changes are flagged, never silently removed.",
-        "index_source_note": "Sina AKShare index endpoint used instead of Eastmoney index_zh_a_hist; same CSI300 underlying.",
-        "rate_convention": "SHIBOR percentage deposit rates, ACT/360 simple quotes; zero=log1p(quote*tenor)/tenor; linear interpolation in continuous zero rates. 1Y=360/360; no extrapolation."}, indent=2) + "\n")
+    for name, frame in frames.items():
+        frame = frame[(frame.date >= "2019-01-01") & (frame.date <= "2026-11-04")]
+        frames[name] = frame
+        path = CLEAN / f"{name}.csv"
+        frame.to_csv(path, index=False, date_format="%Y-%m-%d")
+        artifacts[str(path.relative_to(ROOT))] = {"sha256": digest(path), "source": sources[name],
+            "rows": len(frame), "start": str(frame.date.min().date()), "end": str(frame.date.max().date()),
+            "schema": {c: ("ISO date" if c=="date" else "index points" if c=="close" else "percent per annum") for c in frame},
+            "duplicates": 0, "missing_values": int(frame.isna().sum().sum())}
+    params, quality = calibrate(frames["if_main"], frames["csi300_index"], frames["shibor"])
+    path = CLEAN / "calibration.json"
+    path.write_text(json.dumps(params, indent=2, allow_nan=False)+"\n")
+    artifacts[str(path.relative_to(ROOT))] = {"sha256": digest(path), "source": "derived by data/fetch.py from verified snapshots", "schema": "spot/strike/barrier in index points; r,sigma,mu annual decimal; T years; steps integer"}
+    META.write_text(json.dumps({"retrieved_at_utc": datetime.now(timezone.utc).isoformat(), "artifacts": artifacts,
+        "calibration": quality, "retrieval_failures": errors}, indent=2, allow_nan=False)+"\n")
 
 
-def verify_calibrate():
+def offline():
     meta = json.loads(META.read_text())
-    frames = {}
-    for name, info in meta["artifacts"].items():
-        if digest(CLEAN / name) != info["sha256"]:
-            raise ValueError(f"Checksum mismatch: {name}")
-        frames[name] = pd.read_csv(CLEAN / name)
-        inspect(frames[name], "1Y" if name == "shibor.csv" else "close")
-    f = frames["if_main.csv"]
-    if (pd.Timestamp(f.date.iloc[-1]) - pd.Timestamp(f.date.iloc[0])).days < 365.25 * 5:
-        raise ValueError("Less than five years of futures data")
-    ret = np.diff(np.log(f.close.to_numpy()))
-    index = frames["csi300_index.csv"]
-    index_dates = set(index.loc[(index.date >= f.date.iloc[0]) & (index.date <= f.date.iloc[-1]), "date"])
-    missing_against_index = sorted(index_dates - set(f.date))
-    sigma = float(np.std(ret, ddof=1) * np.sqrt(252))
-    log_drift = float(np.mean(ret) * 252)
-    rates = frames["shibor.csv"]
-    rates = rates.loc[rates.date <= f.date.iloc[-1]].dropna(subset=list(TENORS))
-    last = rates.iloc[-1]
-    tenors = np.array(list(TENORS.values())) / 360
-    zeros = np.log1p(last[list(TENORS)].to_numpy(dtype=float) / 100 * tenors) / tenors
-    r = float(np.interp(1., tenors, zeros))
-    flags = np.flatnonzero(np.abs(ret) > .05)
-    calibration = {"S0": float(f.close.iloc[-1]), "K": float(f.close.iloc[-1]),
-        "B": float(f.close.iloc[-1]) * 1.2, "r": r, "sigma": sigma,
-        "mu": log_drift + sigma**2 / 2, "annual_mean_log_return": log_drift,
-        "T": 1., "steps": 252, "observations": len(f), "returns": len(ret),
-        "start": f.date.iloc[0], "end": f.date.iloc[-1], "rate_date": last.date,
-        "rate_quote_1Y_percent": float(last["1Y"]),
-        "index_trading_dates_without_futures": missing_against_index,
-        "gap_treatment": "No fill. Successive-observation returns include gaps; 252 annualization is an approximation. Index calendar is a cross-check, not an official CFFEX calendar.",
-        "abs_log_return_above_5pct": [{"date": f.date.iloc[i+1], "log_return": float(ret[i])} for i in flags],
-        "model": "assignment drift-r GBM, not zero-drift Black-76 futures",
-        "return_convention": "Successive observed daily log close ratios; annualization 252; sample variance ddof=1; no holiday imputation or roll correction."}
-    (CLEAN / "calibration.json").write_text(json.dumps(calibration, indent=2) + "\n")
-    return calibration
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    choice = parser.add_mutually_exclusive_group(required=True)
-    choice.add_argument("--fetch", action="store_true")
-    choice.add_argument("--offline", action="store_true")
-    args = parser.parse_args()
-    if args.fetch:
-        acquire()
-    Console().print(verify_calibrate())
+    for file, spec in meta["artifacts"].items():
+        if digest(ROOT/file) != spec["sha256"]:
+            raise ValueError(f"Checksum mismatch: {file}")
+    frames = [validate(pd.read_csv(CLEAN/f"{n}.csv"), n) for n in ("if_main", "csi300_index", "shibor")]
+    params, _ = calibrate(*frames)
+    saved = json.loads((CLEAN/"calibration.json").read_text())
+    for key in params:
+        if not np.isclose(params[key], saved[key], rtol=1e-12, atol=1e-12):
+            raise ValueError(f"Calibration mismatch: {key}")
+    Console().print("[green]PASS[/green] offline SHA-256, data quality and independent recalibration", params)
+    return params
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--live", action="store_true", help="Retrieve fresh public observations")
+    group.add_argument("--offline", action="store_true", help="Verify existing snapshot (default)")
+    args = parser.parse_args()
+    if args.live:
+        live()
+    offline()
