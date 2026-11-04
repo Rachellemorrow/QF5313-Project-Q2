@@ -1,55 +1,45 @@
-"""Run the complete frozen, offline Q2 pipeline and preserve command evidence.
-
-Run from repository root: python tools/reproduce.py --output results/rebuild
-No smoke flag is used: both default complete experiments are mandatory.
-"""
+"""Execute the entire documented offline workflow, including full neural training."""
 import argparse
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path("results/rebuild"))
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1]
-    out = (root / args.output).resolve()
-    if not out.is_relative_to(root):
-        raise ValueError("Outputs must stay inside repository")
-    out.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, UV_CACHE_DIR=str(root / ".cache/uv"),
-               XDG_CACHE_HOME=str(root / ".cache"), TMPDIR=str(root / ".cache/tmp"),
-               PYTHONPYCACHEPREFIX=str(root / ".cache/pycache"))
+    if sys.version_info[:2] != (3,13):
+        raise RuntimeError("Python 3.13 required")
+    env = dict(os.environ, UV_CACHE_DIR=str(ROOT/".cache/uv"),
+               TMPDIR=str(ROOT/".cache/tmp"), TORCH_HOME=str(ROOT/".cache/torch"),
+               XDG_CACHE_HOME=str(ROOT/".cache"))
     Path(env["TMPDIR"]).mkdir(parents=True, exist_ok=True)
-    prefix = ["uv", "run", "--frozen", "--offline"]
     commands = [
-        ["uv", "sync", "--frozen", "--offline"],
-        prefix + ["python", "data/fetch.py", "--offline"],
-        prefix + ["pytest", "-q"],
-        prefix + ["python", "code/approach1_pricing.py", "--seed", "42", "--output", str(out / "approach1/IF")],
-        prefix + ["python", "code/approach2_hedging.py", "--seed", "42", "--output", str(out / "approach2/IF")],
-        prefix + ["python", "code/compare.py", "--root", str(out)],
+        [sys.executable, "data/fetch.py", "--offline"],
+        [sys.executable, "-m", "pytest", "tests", "tests/integration_data.py", "-q"],
+        [sys.executable, "tools/independent_reference.py"],
+        [sys.executable, "code/approach1_pricing.py", "--seed", str(args.seed)],
+        [sys.executable, "code/approach2_hedging.py", "--seed", str(args.seed)],
+        [sys.executable, "code/compare.py"],
     ]
-    records = []
-    for i, command in enumerate(commands):
-        print("RUN", " ".join(command), flush=True)
-        start = time.perf_counter()
-        log = out / f"command_{i+1}.log"
-        with log.open("w") as handle:
-            result = subprocess.run(command, cwd=root, env=env, stdout=handle, stderr=subprocess.STDOUT)
-        records.append({"command": command, "returncode": result.returncode,
-                        "seconds": time.perf_counter()-start, "log": str(log.relative_to(root)),
-                        "finished_utc": datetime.now(timezone.utc).isoformat()})
-        (out / "execution.json").write_text(json.dumps(records, indent=2) + "\n")
-        if result.returncode:
-            print(log.read_text(), file=sys.stderr)
-            raise SystemExit(result.returncode)
-    print("Complete pipeline passed; see", out / "execution.json")
+    out = ROOT/"results/reproduction"
+    out.mkdir(parents=True, exist_ok=True)
+    record = []
+    for i, cmd in enumerate(commands):
+        started = time.perf_counter()
+        with (out/f"step{i}.log").open("w") as handle:
+            run = subprocess.run(cmd, cwd=ROOT, env=env, stdout=handle, stderr=subprocess.STDOUT)
+        record.append({"command": cmd, "returncode": run.returncode, "seconds": time.perf_counter()-started})
+        (out/"execution.json").write_text(json.dumps(record, indent=2)+"\n")
+        print(record[-1], flush=True)
+        if run.returncode:
+            raise SystemExit(run.returncode)
 
 
 if __name__ == "__main__":
