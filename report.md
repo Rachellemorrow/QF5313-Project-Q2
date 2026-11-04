@@ -174,6 +174,10 @@ the empirical upper tail, including fractional tail mass when required.
 The full benchmark crosses intervals 1, 5 and 21 trading days with costs 0,
 10 and 50 basis points. Paired bootstrap intervals compare held-out strategies;
 these quantify test-path uncertainty, not variability from retraining the model.
+Each cost-specific neural model was trained on the daily rebalancing grid only.
+The same fitted model was subsequently evaluated at 5-day and 21-day rebalancing
+frequencies without frequency-specific retraining; these comparisons therefore
+measure transfer of the daily-trained policy to coarser decision grids.
 
 ## 8. Results and independent audit
 
@@ -392,7 +396,32 @@ training budget and single set of fitted networks; it is not a general impossibi
 result for deep hedging. All policies reached the 20-epoch budget, so the experiment
 does not establish optimization convergence.
 
-## 10. Statement of work
+## 10. Conclusion
+
+Under the assignment-prescribed GBM, the European Monte Carlo price passed the
+Black–Scholes validation with a z-score of 0.627151. The discrete geometric-Asian
+control variate reduced the Asian estimator's variance by approximately 1563.94
+times at matched production path budgets, with additional pilot cost reported
+separately. These results support the numerical implementation within the stated
+model and monitoring conventions.
+
+Across all nine matched cost–frequency combinations, the three fitted neural
+policies had higher held-out CVaR than BS delta hedging; all corresponding marginal
+paired-bootstrap intervals for neural-minus-BS CVaR were positive. Less frequent
+rebalancing reduced turnover and, at positive cost rates, transaction costs, but
+did not uniformly reduce tail loss. For BS hedging, daily rebalancing gave the lowest
+observed CVaR at zero and 10 bp costs, whereas 5-day rebalancing gave the lowest at
+50 bp; moving further
+to 21 days increased CVaR at every cost level relative to 5 days.
+
+These findings are conditional on the IF0 calibration, possible continuous-contract
+roll effects, the prescribed spot-style GBM and accounting conventions, and the
+20-epoch training budget. There is one fitted network per cost, trained on the daily
+grid; the coarser-grid results do not represent frequency-specific retraining.
+The paired-bootstrap intervals describe test-path uncertainty conditional on those
+fits, not training variability or general superiority of either strategy.
+
+## 11. Statement of work
 
 OpenAI established the shared mathematical conventions, independently retrieved and
 verified data, constructed quadrature references and infrastructure, and drafts this

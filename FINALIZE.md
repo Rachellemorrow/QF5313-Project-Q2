@@ -20,11 +20,16 @@ invent missing transcript content. Then:
 ```bash
 git add SESSION.md
 git commit -m "report: finalize authentic parent and child session exports"
-uv run python tools/clean_clone.py --seed 42
+git status --short
 ```
 
-Only after this returns PASS and the group approves the report and submission scope
-may the final `submission` tag be established. An inherited tag with that name already
+The full numerical reproduction has already been accepted for this submission;
+do not rerun training or regenerate numerical results during this documentation-only
+finalization. Preserve the existing reproduction evidence and numerical artifacts.
+
+Only after the final export is verified and the group approves the report and
+submission scope may the final `submission` tag be established. An inherited tag
+with that name already
 points to `0a27070dbeb1b569051c486e51351277a6d06c89`, not this rebuild. It has been
 preserved. Do not use it as this project's final submission; replacing or removing
 it requires explicit authorization recorded in a genuine session. This repository
