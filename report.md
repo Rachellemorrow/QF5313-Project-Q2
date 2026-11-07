@@ -1,191 +1,85 @@
-# Monte Carlo pricing and CVaR hedging calibrated to Chinese futures
+# Question 2 — Monte Carlo Pricing and CVaR Hedging on Chinese Futures
 
-**English draft for student-group mathematical review. Full experiments, independent replay and clean-clone reproduction have passed; final session export and group approval remain pending.**
+## 1. Scope and model convention
 
-## 1. Objective and interpretation
+This study addresses both options of Question 2. Option A develops Monte Carlo estimators for European, arithmetic Asian, up-and-out barrier and cash-or-nothing digital calls, with analytical checks, variance reduction, Greek estimation and computational benchmarks. Option B trains a neural hedging policy by minimizing the 95% conditional value-at-risk (CVaR) of the terminal hedging loss and compares it with Black–Scholes (BS) delta hedging and an unhedged position.
 
-We implement Question 2, Options A and B, of the instructor's assignment.
-The historical IF continuous series supplies a price level and volatility calibration.
-The required simulation is nevertheless a spot-style risk-neutral GBM,
-\(dS_t=rS_tdt+\sigma S_tdW_t\), rather than the usual zero-drift risk-neutral
-futures-price model. Consequently the mandatory analytical reference is Black–Scholes,
-not Black-76. These experiments are model-implied pricing and loss calculations;
-they are not physical-measure forecasts of futures trading risk.
+The IF0 continuous futures series is used for historical calibration. Following the assignment's specified simulation convention, however, the pricing and hedging experiments use a *spot-style* risk-neutral geometric Brownian motion (GBM):
 
-## 2. Data and preprocessing
+$$
+ dS_t=rS_t\,dt+\sigma S_t\,dW_t.
+$$
 
-All observations were newly fetched in this rebuild. Sources, retrieval timestamp,
-units, date ranges, diagnostics and SHA-256 hashes are in `data/metadata.json`.
-`data/fetch.py --offline` verifies hashes and independently recalculates parameters.
-The calibration uses a trailing six-calendar-year window ending at the latest common
-date of IF, CSI300 and SHIBOR observations. Daily log returns are
-\(x_i=\log(S_i/S_{i-1})\), with
-\(\hat\sigma=\sqrt{252\,s_x^2}\) and
-\(\hat\mu=252\bar x+\hat\sigma^2/2\). Historical drift is reported separately
-and is not used as the risk-neutral simulation drift.
-The daily mean is equivalently the intercept estimate in an intercept-only log-return
-regression. Metadata report both iid and Bartlett HAC standard errors for the
-annualized log drift; neither removes unknown continuous-contract roll effects.
+This convention makes the BS call the primary analytical reference. A zero-drift futures-price model and the Black–76 formula represent a different modelling convention; we report a separate check but do not mix the two. All reported hedging losses are simulated under the stated model and should not be interpreted as forecasts of actual futures-trading losses.
 
-Sina IF0 is the provider's main continuous series. No independent back adjustment
-is applied. Constituent contract IDs and exact roll dates are unavailable in this
-endpoint; the largest changes in IF-minus-index basis are recorded as diagnostics,
-not certified roll identifications. Calibration therefore includes possible roll
-discontinuities. Weekday gaps include exchange holidays and are not automatically
-classified as missing observations; comparison against index trading dates is also
-reported. Duplicate dates and missing numerical values cause retrieval to fail.
+## 2. Market data and calibration
 
-The executed snapshot contains 1,899 IF observations and 1,899 CSI300 observations
-from 2019-01-02 to 2026-11-03, plus 1,947 SHIBOR observations. The calibration window
-is 2020-11-03 to 2026-11-03 (1,455 prices, 1,454 log returns). There are no missing IF
-observations relative to the index's trading dates in this window. These counts and
-the following calibration values are recorded in `data/metadata.json` and
-`data/clean/calibration.json`:
+### 2.1 Sources and preprocessing
 
-| Parameter | Executed value |
+The historical inputs comprise the Sina IF0 continuous futures series, the CSI 300 index and SHIBOR tenor quotations. The saved dataset contains 1,899 IF observations and 1,899 CSI 300 observations dated 2 January 2019–3 November 2026, and 1,947 SHIBOR observations. Data provenance, retrieval times, units, quality checks and hashes are recorded in `data/metadata.json`.
+
+The volatility calibration uses the six-year window from 3 November 2020 to 3 November 2026: 1,455 prices and 1,454 daily log returns. No IF observations are missing relative to the CSI 300 trading dates in that window. Returns and annualized estimates are defined by
+
+$$
+ x_i=\log(S_i/S_{i-1}),\qquad
+ \widehat\sigma=\sqrt{252\,s_x^2},\qquad
+ \widehat\mu=252\bar x+\tfrac12\widehat\sigma^2.
+$$
+
+The historical drift is reported for reference only; the risk-neutral simulation uses $r$. The data check distinguishes exchange holidays from actual missing observations, rejects duplicate dates and missing numerical values, and compares the futures and index calendars. Annualized mean log-return uncertainty is also assessed with conventional and Bartlett heteroskedasticity-and-autocorrelation-consistent (HAC) standard errors. Neither method corrects potential contract-roll effects.
+
+The IF0 series is not independently back-adjusted. Exact constituent contracts and roll dates are unavailable from the used endpoint; unusually large changes in the IF–index basis are diagnostic observations, not confirmed roll dates. Consequently, the estimated volatility may contain continuous-contract roll effects.
+
+### 2.2 Parameter estimates
+
+| Quantity | Estimate |
 |---|---:|
-| Initial level / strike | 3978.8 |
-| Barrier | 4774.56 |
-| Annualized volatility | 0.190647912849 |
-| Historical arithmetic GBM drift estimate | -0.012779861736 |
+| Initial price $S_0$ and strike $K$ | 3978.80 |
+| Knockout barrier $B=1.2S_0$ | 4774.56 |
+| Annualized volatility $\widehat\sigma$ | 0.190647912849 |
+| Annualized historical GBM drift $\widehat\mu$ | -0.012779861736 |
 | Annualized mean log return | -0.030953175072 |
-| One-year continuous discount rate | 0.014287446608 |
+| One-year continuously compounded rate $r$ | 0.014287446608 |
 
-Historical plots are `results/data/calibration.html` and `results/data/curve.html`.
+The detailed calibration is in `data/clean/calibration.json`. SHIBOR quotes are treated as simple deposit rates at fixed tenor fractions (days/365 for weekly tenors and months/12 for monthly tenors). The implied zero yield is approximated by $z(u)=\log[1+q(u)u]/u$, with linear interpolation in zero yields and discount factor $e^{-z(T)T}$. The one-year experiment uses the observed one-year node. This construction is a practical deposit-curve approximation, not an arbitrage-free bootstrapped term structure.
 
-SHIBOR tenor quotes, expressed in percent per annum, are approximated as simple
-fixed-tenor-fraction deposit rates (days/365 for weeks, months/12 for months).
-We form \(z(u)=\log(1+q(u)u)/u\), linearly interpolate
-zero yields and discount by \(e^{-z(T)T}\). At the principal one-year maturity this
-uses the observed one-year node. This is an explicit deposit-curve approximation,
-not a bootstrapped arbitrage-free market zero curve.
+## 3. Option A — Monte Carlo pricing
 
-## 3. Simulation, contracts and analytical references
+### 3.1 Simulation and payoffs
 
-We take \(T=1\), \(m=252\), \(K=S_0\), and \(B=1.2S_0\), with
-\(t_i=iT/m\). The simulator applies
-\[
-S_{i+1}=S_i\exp\{(r-\sigma^2/2)T/m+\sigma\sqrt{T/m}Z_i\}.
-\]
-The initial point is excluded from Asian averaging and barrier monitoring.
-The arithmetic Asian payoff is \((m^{-1}\sum_{i=1}^m S_i-K)^+\);
-the barrier payoff is \((S_m-K)^+1\{\max_{1\le i\le m}S_i<B\}\);
-the digital pays \(1\{S_m>K\}\). European validation uses \((S_m-K)^+\).
-All price observations are multiplied by \(e^{-rT}\).
+Set $T=1$ year, $m=252$ monitoring dates, $\Delta t=T/m$, $K=S_0$ and $B=1.2S_0$. With independent standard normal innovations $Z_i$,
 
-For the European call,
-\(C=S_0\Phi(d_1)-Ke^{-rT}\Phi(d_2)\),
-\(d_1=[\log(S_0/K)+(r+\sigma^2/2)T]/(\sigma\sqrt T)\),
-\(d_2=d_1-\sigma\sqrt T\).
-We evaluate \(z=(\widehat C-C)/\widehat{SE}\) and report actual violations
-of the assignment's \(|z|\le3\) criterion. Independent lead references use
-one-dimensional quadrature without importing the numerical implementation
-(`tools/independent_reference.py`).
+$$
+ S_{i+1}=S_i\exp\left[\left(r-\frac{\sigma^2}{2}\right)\Delta t
+ +\sigma\sqrt{\Delta t}\,Z_i\right].
+$$
 
-The newly executed independent reference artifact `results/independent/reference.json`
-gives a BS call value of 329.077643012334 and quadrature value of 329.077643012334
-(rounded), delta 0.567599324304 and vega 1564.469149519032 per unit volatility.
-The digital reference is 0.484891562413. The geometric-Asian quadrature reference is
-181.285332694516, independently agreeing with the discrete lognormal closed form.
-These are deterministic analytical checks, not Monte Carlo validation results.
+The four payoff definitions are
 
-As a separately labelled model-convention check, the same initial level interpreted
-as a martingale futures price gives the Black-76 value 297.873559517241. Independent
-zero-drift lognormal quadrature agrees (`secondary_black76_zero_drift_*` fields in
-the reference artifact). This secondary calculation is not substituted for the
-assignment's drift-r Monte Carlo validation or hedging model.
+$$
+\begin{aligned}
+H_{\mathrm{Euro}}&=(S_T-K)^+,\\
+H_{\mathrm{Asian}}&=\left(\frac1m\sum_{i=1}^m S_{t_i}-K\right)^+,\\
+H_{\mathrm{barrier}}&=(S_T-K)^+\mathbf1\!\left\{\max_{1\le i\le m}S_{t_i}<B\right\},\\
+H_{\mathrm{digital}}&=\mathbf1\{S_T>K\}.
+\end{aligned}
+$$
 
-## 4. Variance reduction and uncertainty
+The arithmetic average and barrier maximum are based on the 252 future monitoring points; $S_0$ is excluded. The barrier is monitored discretely. Every simulated price is the sample mean of $e^{-rT}H$. NumPy and PyTorch use the same innovations for cross-engine arithmetic verification; matching outputs therefore do not constitute independent random-number replication.
 
-Naive standard errors use independent discounted payoffs. For antithetic sampling,
-the independent observation is the pair average \([Y(Z)+Y(-Z)]/2\), not each
-individual payoff. Comparisons must account for the two paths in each pair.
-The Asian control variate is the discounted geometric-Asian call, with coefficient
-estimated on an independent pilot and then held fixed for production samples.
+For a European call the analytical reference is
 
-Writing \(G=\exp(m^{-1}\sum_i\log S_i)\), its log mean and variance are
-\[
-a=\log S_0+(r-\sigma^2/2)\bar t,\qquad
-b=\sigma^2m^{-2}\sum_{i,j}\min(t_i,t_j).
-\]
-Thus its discounted call expectation is
-\[
-e^{-rT}\{e^{a+b/2}\Phi[(a+b-\log K)/\sqrt b]
--K\Phi[(a-\log K)/\sqrt b]\}.
-\]
-The full covariance-matrix expression is evaluated independently in the reference
-script. Variance reduction and confidence intervals must be read from executed
-artifacts; the indicative factor-five target is not imposed on outputs.
+$$
+ C_{\mathrm{BS}}=S_0\Phi(d_1)-Ke^{-rT}\Phi(d_2),\qquad
+ d_1=\frac{\log(S_0/K)+(r+\sigma^2/2)T}{\sigma\sqrt T},\quad
+ d_2=d_1-\sigma\sqrt T.
+$$
 
-## 5. Greeks and convergence
+Independent quadrature reproduces the BS price $329.0776430$, delta $0.5675993$ and vega $1564.4691495$ (vega per unit absolute volatility). The unit digital analytical price is $0.48489156$. As a separate check under a zero-drift futures-price process, the Black–76 call price is $297.8735595$; it is not the reference used to validate the principal simulation.
 
-For continuous vanilla and Asian payoffs, differentiate paths with respect to spot
-and volatility: \(\partial S_t/\partial S_0=S_t/S_0\) and
-\(\partial S_t/\partial\sigma=S_t(W_t-\sigma t)\).
-Call payoff derivatives multiply these quantities (or their arithmetic mean) by
-the corresponding in-the-money indicator and discount factor. Vanilla benchmarks
-are \(\Delta=\Phi(d_1)\), \(\nu=S_0\phi(d_1)\sqrt T\).
-For the unit digital call the analytical references are
-\(\Delta_D=e^{-rT}\phi(d_2)/(S_0\sigma\sqrt T)\) and
-\(\nu_D=-e^{-rT}\phi(d_2)d_1/\sigma\), independently computed in the reference
-artifact and compared with all finite-difference bumps below.
-Central differences share random shocks, with spot bumps
-\(\{.1,.01,.001\}S_0\) and volatility bumps
-\(\{.1,.01,.001\}\sigma\); vega is per unit absolute volatility.
-Naive pathwise differentiation of digital and knockout indicators omits boundary
-contributions and is invalid. Their finite-difference uncertainty and bump dependence
-must therefore be examined explicitly.
+### 3.2 Prices and validation
 
-Convergence is assessed through independent repetitions at multiple path counts.
-Log–log RMSE slopes are estimated rather than prescribed. A numerical Asian reference
-has uncertainty of its own, which may generate an RMSE floor and must be disclosed.
-Finite-difference truncation bias similarly need not disappear by increasing paths.
-
-## 6. Computational profiling
-
-The Python-loop and vectorized implementations are benchmarked at matched workloads
-using repeated timings and an actual hot-loop profile. Vectorization requires
-path-by-time arrays and temporaries; speedup is not interpreted as a memory saving.
-The recorded environment is macOS 26.6.2 on arm64, with 10 logical CPU cores,
-Python 3.13.13, NumPy 2.2.6 and PyTorch 2.7.1 (`results/environment.json`). The
-integrated hedging run uses one CPU thread and does not use the available MPS device.
-Executed timing and memory results appear below; they are machine-specific.
-
-## 7. Deep hedging and CVaR
-
-The policy uses only current normalized price and time, with at most three hidden
-layers. At rebalancing times \(t_j\), the principal European-call P&L is literally
-the assignment's convention:
-\[
-V_T=\sum_j e^{r(T-t_j)}\Delta_j(S_{t_{j+1}}-S_{t_j})
--\kappa\sum_j|\Delta_j-\Delta_{j-1}|S_{t_j}-(S_T-K)^+.
-\]
-Initial position is zero, no premium is added, and no terminal liquidation cost is
-charged. Costs are not accumulated to maturity. The gain accumulation factor uses
-the beginning of each holding interval, as specified, rather than silently replacing
-it with another self-financing cash-account convention. Neural, BS and zero-hedge
-policies share the same paths, payoff and accounting.
-
-Loss is \(L=-V_T\). Training minimizes
-\(\eta+(1-.95)^{-1}n^{-1}\sum_i(L_i-\eta)^+\) jointly over the MLP and
-\(\eta\), using Adam and minibatches. At least 131072 training paths and separate
-validation/test seeds are required. Held-out CVaR is evaluated independently using
-the empirical upper tail, including fractional tail mass when required.
-The full benchmark crosses intervals 1, 5 and 21 trading days with costs 0,
-10 and 50 basis points. Paired bootstrap intervals compare held-out strategies;
-these quantify test-path uncertainty, not variability from retraining the model.
-Each cost-specific neural model was trained on the daily rebalancing grid only.
-The same fitted model was subsequently evaluated at 5-day and 21-day rebalancing
-frequencies without frequency-specific retraining; these comparisons therefore
-measure transfer of the daily-trained policy to coarser decision grids.
-
-## 8. Results and independent audit
-
-<!-- GENERATED_RESULTS_START -->
-
-The following tables are generated from `results/approach1/if_main/metrics.json` and `results/approach2/if_main/metrics.json`. Values are index-point payoffs/P&L; the digital pays one unit.
-
-### Executed pricing and validation
+The main pricing run gives the following results (prices in index points, except the unit digital):
 
 | Payoff | NumPy price | SE | 95% lower | 95% upper | PyTorch price |
 | --- | --- | --- | --- | --- | --- |
@@ -194,9 +88,28 @@ The following tables are generated from `results/approach1/if_main/metrics.json`
 | digital | 0.48586726 | 0.0013613426 | 0.48319903 | 0.48853549 | 0.48586726 |
 | european | 329.97462 | 1.4302484 | 327.17134 | 332.77791 | 329.97462 |
 
-European BS reference: 329.0776430123; MC z-score: 0.627151; criterion passed: True. Engines use identical shocks; their agreement checks arithmetic implementation, not independence of RNG libraries.
+The European Monte Carlo estimate is $329.97462$, with standard error $1.43025$. Relative to the BS reference, $z=(329.97462-329.0776430)/1.43025=0.62715$, satisfying the assignment's $|z|\leq3$ validation criterion. The observed agreement between engines verifies their consistent evaluation of the specified payoffs.
 
-### Asian variance reduction
+### 3.3 Variance reduction for the arithmetic Asian call
+
+Two variance-reduction estimators are compared with independent discounted-payoff sampling. In the antithetic estimator, the independent sampling unit is the average of the outcomes generated by $(Z,-Z)$; uncertainty is calculated at the *pair* level. For the control variate, the correlated variable is the discounted discrete geometric-Asian call. Its coefficient is fitted on a separate pilot sample and then fixed in the production run.
+
+Let $G=\exp[m^{-1}\sum_i\log S_{t_i}]$. Since $\log G$ is normal, define
+
+$$
+ a=\log S_0+(r-\sigma^2/2)\bar t,\qquad
+ b=\frac{\sigma^2}{m^2}\sum_{i=1}^m\sum_{j=1}^m\min(t_i,t_j).
+$$
+
+Then the known expectation of the discounted geometric-Asian call is
+
+$$
+ \mathbb E[e^{-rT}(G-K)^+]
+ =e^{-rT}\left[e^{a+b/2}\Phi\!\left(\frac{a+b-\log K}{\sqrt b}\right)
+ -K\Phi\!\left(\frac{a-\log K}{\sqrt b}\right)\right].
+$$
+
+The production estimates are:
 
 | Estimator | Price | SE | Variance of estimate | 95% lower | 95% upper |
 | --- | --- | --- | --- | --- | --- |
@@ -204,14 +117,143 @@ European BS reference: 329.0776430123; MC z-score: 0.627151; criterion passed: T
 | control_variate | 187.89186 | 0.019935527 | 0.00039742525 | 187.85278 | 187.93093 |
 | naive | 187.60691 | 0.7883828 | 0.62154744 | 186.06168 | 189.15214 |
 
-Independent-pilot coefficient beta: 1.031544394; A/G correlation 0.999680345. Production path budgets are matched; pilot overhead is 16384 additional paths (0.0838s).
+These figures come from a separate variance-reduction experiment and therefore need not equal the naive Asian estimate in the main pricing table. The fitted pilot coefficient is $\widehat\beta=1.0315444$ and the arithmetic/geometric payoff correlation is $0.9996803$. Production path budgets are matched; the control variate uses another 16,384 pilot paths (approximately 0.0838 seconds).
 
 | Method | Variance reduction | Bootstrap lower | Bootstrap upper |
 | --- | --- | --- | --- |
 | Antithetic | 1.7913978 | 1.755625 | 1.8280754 |
 | Control variate | 1563.9355 | 1520.8636 | 1607.499 |
 
-### Greeks
+The control variate reduces the estimated sampling variance by a factor of **1563.94**, with a bootstrap interval of **[1520.86, 1607.50]** for the variance-reduction ratio. The antithetic improvement is more modest, at approximately 1.79. Variance reduction is evaluated using the estimator's independent sampling units and does not imply an identical runtime or total path budget once pilot sampling is included.
+
+### 3.4 Greeks and estimator behaviour
+
+For the European and arithmetic Asian calls, pathwise derivatives follow from
+
+$$
+ \frac{\partial S_t}{\partial S_0}=\frac{S_t}{S_0},\qquad
+ \frac{\partial S_t}{\partial\sigma}=S_t(W_t-\sigma t).
+$$
+
+The payoff derivatives incorporate the appropriate in-the-money indicator and discount factor. For European calls, $\Delta_{\mathrm{BS}}=\Phi(d_1)$ and $\nu_{\mathrm{BS}}=S_0\phi(d_1)\sqrt T$. Central finite differences (FD) use common random numbers at spot and volatility bump fractions $0.001$, $0.01$ and $0.1$. For discontinuous digital and barrier payoffs, naive pathwise differentiation omits boundary terms and is invalid; FD is reported with its sampling uncertainty instead.
+
+At the smallest bump, the European FD delta is $0.567870$ (SE $0.001615$), compared with pathwise delta $0.567966$ (SE $0.001616$). For the Asian call, the corresponding figures are $0.538783$ and $0.538754$. The European FD vega is $1562.701$ (SE $8.085$), compared with pathwise $1562.692$. These agree within their observed sampling variability at the small bump.
+
+A large spot bump gives a different conclusion: the paired pathwise-minus-FD discrepancy is $12.836$ standard errors for the European delta and $12.625$ for the Asian delta at the $10\%$ bump. This is consistent with material finite-difference truncation bias. For the unit digital, the analytical delta is $0.0005183591$; the FD delta at the $10\%$ bump is $0.0004980210$, a discrepancy of $-12.122$ FD standard errors. The full bump-by-bump results are retained in Appendix A. Decreasing the bump is not a universal remedy, because finite-difference variance for discontinuous payoffs can increase as the perturbation shrinks.
+
+### 3.5 Convergence and computational performance
+
+Monte Carlo root mean squared error (RMSE) is assessed using independent repetitions at increasing simulation sizes. The estimated log–log slopes are:
+
+| Estimator | RMSE slope | OLS slope SE | Bootstrap lower | Bootstrap upper | SE-versus-N slope |
+| --- | --- | --- | --- | --- | --- |
+| vanilla_naive | -0.52434448 | 0.033794341 | -0.5953035 | -0.46284215 | -0.49967175 |
+| asian_naive | -0.54901151 | 0.046514527 | -0.60536454 | -0.48312048 | -0.50059834 |
+| asian_anti | -0.4928473 | 0.02837916 | -0.55032679 | -0.43404393 | -0.50146489 |
+| asian_cv | -0.51292858 | 0.022532822 | -0.57810601 | -0.44086546 | -0.49732015 |
+
+The results are broadly consistent with the theoretical $N^{-1/2}$ sampling rate. The independent Asian numerical reference, computed with antithetic geometric control variates and $4,194,304$ simulated paths, is $187.906634$ with SE $0.003499$. The slope intervals condition on this estimated reference and do not include its uncertainty; a noisy numerical benchmark can introduce an apparent RMSE floor.
+
+A matched-workload comparison of Python loops and NumPy vectorization produced:
+
+| Loop seconds | NumPy seconds | Speedup | Loop peak bytes | NumPy peak bytes |
+| --- | --- | --- | --- | --- |
+| 0.17263342 | 0.0075886168 | 22.748996 | 8096512 | 32352555 |
+
+NumPy was approximately **22.75 times faster** in this test, with higher traced peak memory (32.35 MB versus 8.10 MB). These values are trace-level allocations and machine-specific; they should not be interpreted as total resident memory usage. The recorded software environment is macOS on arm64 with Python 3.13.13, NumPy 2.2.6 and PyTorch 2.7.1.
+
+## 4. Option B — Deep hedging
+
+### 4.1 Trading P&L and risk criterion
+
+The hedging target is the one-year European call. A policy $\Delta_j$ is selected at each rebalancing date $t_j$. The implemented terminal P&L is
+
+$$
+ V_T=\sum_j e^{r(T-t_j)}\Delta_j(S_{t_{j+1}}-S_{t_j})
+ -\kappa\sum_j|\Delta_j-\Delta_{j-1}|S_{t_j}
+ -(S_T-K)^+.
+$$
+
+Here $\Delta_{-1}=0$, $\kappa$ is the proportional transaction-cost rate, and $L=-V_T$ is terminal loss. This follows the assignment's explicit accounting convention: no initial option premium, no terminal liquidation charge, and no maturity accumulation on transaction costs. The same paths, payoffs and cash-flow convention are used for the neural policy, BS delta hedge and zero hedge.
+
+For tail probability $1-\alpha=0.05$, training minimizes the Rockafellar–Uryasev representation
+
+$$
+ \operatorname{CVaR}_{0.95}(L)
+ =\min_{\eta}\left\{\eta+\frac{1}{0.05}\,\mathbb E[(L-\eta)^+]\right\}.
+$$
+
+The neural weights and the auxiliary threshold $\eta$ are optimized jointly. Reported held-out CVaR is computed independently from the test-loss tail, including fractional tail mass if needed, rather than reporting the training objective as a test score.
+
+### 4.2 Architecture and experimental design
+
+The network has dimensions **2–32–32–1**, two SiLU hidden layers and an unrestricted scalar hedge output. Its inputs are normalized current price and time; no future price information is supplied. Adam is used with weight learning rate $0.001$, threshold learning rate $1.0$, minibatch size $2,048$, validation patience of five epochs and a maximum of 20 epochs. Each transaction-cost level has its own fitted network. The experiment uses 131,072 training paths, 16,384 validation paths and 16,384 held-out test paths. Train/validation/test seeds are 42/52/62; initialization seeds are 72, 73 and 74 for the three cost-specific fits.
+
+The networks are trained with **daily** rebalancing. Each fitted network is evaluated on daily, 5-day and 21-day decision grids without retraining for the coarser grids. Consequently, those tests assess how a daily-trained policy transfers to less frequent execution; they are not separate optimal policies for each frequency.
+
+| Training cost | Epochs | Best validation CVaR | Restored eta |
+| --- | --- | --- | --- |
+| 0.0 | 20 | 402.849 | 393.25513 |
+| 0.001 | 20 | 422.00179 | 411.99515 |
+| 0.005 | 20 | 525.2261 | 515.07263 |
+
+All three fits reached the 20-epoch budget. The restored checkpoints had the best validation CVaR among the observed epochs, but this does not establish convergence to a global or even a stationary CVaR optimum.
+
+### 4.3 Held-out hedging comparison
+
+Rebalancing intervals are 1, 5 and 21 trading days; transaction-cost rates are $0$, $0.001$ (10 basis points) and $0.005$ (50 basis points). The comparison below reports the empirical 95% CVaR of terminal loss. Smaller CVaR indicates better tail-loss performance.
+
+| Rebalance (days) | Cost (bp) | BS CVaR$_{95}$ | Neural CVaR$_{95}$ | Neural − BS | 95% paired bootstrap CI |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0 | 346.797 | 402.127 | +55.330 | [54.233, 56.438] |
+| 1 | 10 | 375.492 | 421.326 | +45.835 | [44.252, 47.345] |
+| 1 | 50 | 509.484 | 524.875 | +15.390 | [12.981, 17.430] |
+| 5 | 0 | 387.912 | 437.196 | +49.284 | [46.628, 51.769] |
+| 5 | 10 | 402.690 | 440.082 | +37.393 | [34.819, 40.182] |
+| 5 | 50 | 465.731 | 502.190 | +36.458 | [32.940, 39.483] |
+| 21 | 0 | 473.550 | 525.351 | +51.800 | [47.030, 57.043] |
+| 21 | 10 | 481.748 | 511.893 | +30.145 | [25.614, 33.872] |
+| 21 | 50 | 514.930 | 545.035 | +30.104 | [25.420, 35.073] |
+
+The zero-hedge CVaR is **1908.777** under every cost/frequency combination because the zero policy never trades. Both BS and neural strategies substantially reduce tail exposure relative to remaining unhedged. However, the fitted neural policy has **higher** held-out CVaR than BS delta hedging in **all nine** comparisons. The observed neural-minus-BS differences range from 15.390 to 55.330 index points. All nine marginal paired-bootstrap intervals are strictly positive.
+
+The intervals are constructed by resampling matched held-out paths with the two policies evaluated on the same shocks. They describe test-set sampling variability **conditional on the trained policies**. They do not account for parameter re-estimation, multiple-comparison adjustments or variability across independent training runs. Thus the experiment establishes underperformance for these particular trained policies and settings, not a general failure of deep hedging.
+
+Transaction costs create a clear trade-off between rebalancing frequency and hedge error. For BS hedging, the lowest observed CVaR occurs with daily rebalancing at zero cost and 10 bp, but with **5-day** rebalancing at 50 bp (465.731, compared with 509.484 for daily). Rebalancing every 21 days increases BS tail loss relative to every five days at each cost. The full mean-P&L, P&L variance, transaction-cost and turnover results are presented in Appendix B.
+
+## 5. Reproducibility and independent verification
+
+The project uses a pinned Python 3.13 environment (`pyproject.toml`, `uv.lock`), committed data snapshots and an offline data-validation route in `data/fetch.py`. The `README.md` gives the repository-specific execution sequence. Main numerical outputs are written to `results/approach1/if_main/metrics.json` and `results/approach2/if_main/metrics.json`; figures are generated in `results/data/`, `results/approach1/if_main/` and `results/approach2/if_main/`. These `results/` files are regenerated by the pipeline and are not assumed to be committed to Git.
+
+Independent analytical references and review are documented in `tools/independent_reference.py`, `AUDIT.md` and `RESEARCH_PROTOCOL.md`. A clean-clone execution using the pinned dependencies returned **PASS**, including full neural retraining and held-out evaluation, rather than merely reloading a saved model. In the documented independent reproduction, 325 numerical pricing fields and 631 numerical hedging/history fields agreed with the reference outputs within the prescribed numerical tolerances; machine-dependent timings were excluded from equality checks. A further full clean-clone run on 5 November 2026 also returned PASS.
+
+The final OpenCode parent and two child sessions were exported into `SESSION.md` with `"final": true`, including native message and tool records. The source repository preserves the development commits. The final GitHub merge, group report approval and repository-wide submission tag are separate submission steps; these are not treated as completed numerical experiments.
+
+Earlier direct `pytest` runs did not explicitly enforce a repository-local temporary directory, so their historical write-locality compliance could not be verified retroactively. The configuration now points temporary test output to `.cache/pytest-tmp`; the unresolved historical uncertainty remains disclosed in `AUDIT.md`.
+
+## 6. Discussion and limitations
+
+The principal pricing check is consistent with the prescribed GBM: the European Monte Carlo estimate is within three estimated standard errors of the BS value. The very high arithmetic/geometric Asian payoff correlation explains the unusually large control-variate gain. For Greek estimation, common random numbers improve paired comparisons, but large finite-difference bumps generate material bias and discontinuous payoffs require particular care.
+
+The hedge comparison depends on several modelling choices. IF0 may contain contract-roll discontinuities; volatility and the discount curve are held fixed; the hedge dynamics use a spot-style drift-$r$ GBM rather than a futures martingale; the barrier is discretely monitored; and the P&L cash flows follow the assignment's simplified convention. The simulation assesses risk under that model, not under an empirically estimated physical distribution of future returns.
+
+The neural results are limited by one network architecture, one fitted network per cost level and a 20-epoch training budget. In particular, the five- and 21-day evaluations do not retrain their policies for those frequencies. Paired bootstrap confidence intervals assess held-out-path uncertainty, but cannot rule out better outcomes under new initializations, longer optimization, richer policy states or alternative risk specifications. None of those unexecuted alternatives is claimed as an empirical result.
+
+## 7. Conclusion
+
+The Monte Carlo pricing implementation passes the European BS validation criterion ($z=0.627$). The discrete geometric-Asian control variate reduces the variance of the arithmetic Asian estimator by approximately **1564 times**, while convergence estimates remain close to the expected square-root Monte Carlo rate. Vectorization substantially reduces runtime at the cost of additional memory allocation.
+
+In the hedging experiment, both tested policies improve markedly on the unhedged tail-loss benchmark. BS delta hedging nevertheless has a lower 95% CVaR than each of the three trained neural policies at every evaluated transaction-cost and rebalancing-frequency combination. When transaction costs are high, more frequent rebalancing is not automatically preferable: the lowest BS tail loss at 50 bp occurs on the 5-day grid. These conclusions apply to the calibrated model, specified accounting rules and executed training budget.
+
+## 8. Statement of work
+
+The implementation used OpenCode with an OpenAI lead agent, a DeepSeek numerical subagent and a Kimi independent-audit subagent. OpenAI established model conventions, assembled and checked market data, produced independent analytical references, integrated the code and ran the full reproduction checks. DeepSeek developed and tested the numerical pricing and initial neural-hedging components and repaired identified defects. Kimi examined the data and algorithms independently and recorded review findings. The genuine session history is preserved in `SESSION.md`, with supporting roles and identifiers in `RESEARCH_PROTOCOL.md`.
+
+The student group is responsible for reviewing and approving the mathematical assumptions, quantitative interpretation, report text and final submission. Agent-generated calculations and wording are treated as material to be verified against the executed outputs, not as substitutes for that responsibility.
+
+## Appendix A. Detailed Greek sensitivity results
+
+The bump fraction is relative to $S_0$ for delta and to $\sigma$ for vega. FD and pathwise standard errors are reported separately. A dash indicates that naive pathwise differentiation is invalid for the discontinuous payoff.
 
 | Payoff | Greek | Fractional bump | FD | FD SE | Pathwise | Pathwise SE |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -240,6 +282,8 @@ Independent-pilot coefficient beta: 1.031544394; A/G correlation 0.999680345. Pr
 | european | vega | 0.01 | 1562.7234 | 8.085378 | 1562.6918 | 8.0854865 |
 | european | vega | 0.1 | 1562.6886 | 8.0852148 | 1562.6918 | 8.0854865 |
 
+The paired pathwise-minus-FD differences below use the same simulation shocks and therefore have smaller standard errors than differences between independent estimates:
+
 | Paired PW minus FD | Mean difference | Paired SE | Difference/SE |
 | --- | --- | --- | --- |
 | asian_delta_h0.001 | -2.8706518e-05 | 6.6839153e-05 | -0.42948657 |
@@ -255,7 +299,7 @@ Independent-pilot coefficient beta: 1.031544394; A/G correlation 0.999680345. Pr
 | vanilla_vega_h0.01 | -0.031646866 | 0.021756684 | -1.4545814 |
 | vanilla_vega_h0.1 | 0.0031177806 | 0.059401797 | 0.052486301 |
 
-At the 10% spot bump, absolute paired delta difference/SE values are 12.836 (vanilla) and 12.625 (Asian). Thus agreement must be assessed bump by bump rather than asserted universally. Large spot bumps introduce smoothing/truncation bias. Discontinuous payoffs can have rising finite-difference variance as bumps shrink; a sample SE is not an estimate of truncation bias.
+Analytical digital checks are:
 
 | Digital Greek | Bump fraction | FD | Analytical | (FD-analytical)/SE |
 | --- | --- | --- | --- | --- |
@@ -266,170 +310,42 @@ At the 10% spot bump, absolute paired delta difference/SE values are 12.836 (van
 | vega | 0.01 | -0.36491759 | -0.35116358 | -0.5130094 |
 | vega | 0.1 | -0.34045824 | -0.35116358 | 1.3150238 |
 
-### Convergence
+## Appendix B. Additional held-out hedging diagnostics
 
-| Estimator | RMSE slope | OLS slope SE | Bootstrap lower | Bootstrap upper | SE-versus-N slope |
-| --- | --- | --- | --- | --- | --- |
-| vanilla_naive | -0.52434448 | 0.033794341 | -0.5953035 | -0.46284215 | -0.49967175 |
-| asian_naive | -0.54901151 | 0.046514527 | -0.60536454 | -0.48312048 | -0.50059834 |
-| asian_anti | -0.4928473 | 0.02837916 | -0.55032679 | -0.43404393 | -0.50146489 |
-| asian_cv | -0.51292858 | 0.022532822 | -0.57810601 | -0.44086546 | -0.49732015 |
+Reported transaction costs are in the same index-point convention as the hedging P&L. Turnover is the sum of absolute changes in hedge positions. The zero hedge has mean P&L $-336.243$, P&L variance $273370.05$, zero transaction cost and zero turnover throughout.
 
-Independent Asian reference: `{"antithetic": true, "beta": 1.0320540353027041, "method": "geometric control-variate (independent pilot beta, chunked antithetic production, distinct chunk seeds)", "n": 2097152, "n_pilot": 16384, "n_simulated_paths": 4194304, "price": 187.90663391055116, "se": 0.003498590570753974}`. Bootstrap slope intervals condition on this estimated reference and pilot; they do not integrate reference uncertainty. The original noisier reference produced a flat CV slope and is retained under `results/archive/initial_option_a`; the redesigned reference reduces, but does not eliminate, that uncertainty.
+| Days | Cost (bp) | Policy | Mean P&L | P&L variance | Mean transaction cost | Turnover |
+|---:|---:|---|---:|---:|---:|---:|
+| 1 | 0 | BS | -301.194 | 565.817 | 0.000 | 5.596 |
+| 1 | 0 | Neural | -299.422 | 14703.596 | 0.000 | 6.452 |
+| 1 | 10 | BS | -323.397 | 650.536 | 22.203 | 5.596 |
+| 1 | 10 | Neural | -324.727 | 7058.642 | 23.569 | 5.889 |
+| 1 | 50 | BS | -412.207 | 2118.075 | 111.013 | 5.596 |
+| 1 | 50 | Neural | -404.187 | 9456.399 | 104.354 | 5.144 |
+| 5 | 0 | BS | -300.669 | 1574.301 | 0.000 | 2.826 |
+| 5 | 0 | Neural | -299.250 | 15269.470 | 0.000 | 3.195 |
+| 5 | 10 | BS | -311.883 | 1616.615 | 11.214 | 2.826 |
+| 5 | 10 | Neural | -312.666 | 7877.242 | 11.725 | 2.931 |
+| 5 | 50 | BS | -356.740 | 2012.161 | 56.071 | 2.826 |
+| 5 | 50 | Neural | -352.824 | 10730.237 | 53.143 | 2.626 |
+| 21 | 0 | BS | -300.758 | 5600.503 | 0.000 | 1.607 |
+| 21 | 0 | Neural | -299.470 | 17576.002 | 0.000 | 1.763 |
+| 21 | 10 | BS | -307.134 | 5662.959 | 6.377 | 1.607 |
+| 21 | 10 | Neural | -307.668 | 10958.943 | 6.515 | 1.631 |
+| 21 | 50 | BS | -332.641 | 5951.270 | 31.883 | 1.607 |
+| 21 | 50 | Neural | -330.348 | 13924.078 | 30.575 | 1.519 |
 
-### Profiling
+## Appendix C. Output and figure locations
 
-| Loop seconds | NumPy seconds | Speedup | Loop peak bytes | NumPy peak bytes |
-| --- | --- | --- | --- | --- |
-| 0.17263342 | 0.0075886168 | 22.748996 | 8096512 | 32352555 |
+| Output | Location |
+|---|---|
+| Input metadata and calibration | `data/metadata.json`, `data/clean/calibration.json` |
+| Independent analytical reference | `results/independent/reference.json` |
+| Pricing metrics | `results/approach1/if_main/metrics.json` |
+| Hedging metrics | `results/approach2/if_main/metrics.json` |
+| Data and curve figures | `results/data/calibration.html`, `results/data/curve.html` |
+| Pricing figures | `results/approach1/if_main/convergence.html`, `greeks.html`, `profiling.html` |
+| Hedging figures | `results/approach2/if_main/training.html`, `comparison.html`, `loss_histogram.html` |
+| Independent review and execution guidance | `AUDIT.md`, `RESEARCH_PROTOCOL.md`, `README.md` |
 
-These are matched supplied-shock workloads. Memory values are traced allocations, not total process RSS. The raw hot-loop profile is stored in the metrics history. CPU contention can affect wall-clock measurements.
-
-### Full-size neural training
-
-Architecture: [2, 32, 32, 1], SiLU hidden activations, unconstrained scalar output. Training paths: 131072; validation: 16384; test: 16384. Seeds: `{"initialization": [72, 73, 74], "test": 62, "train": 42, "validation": 52}`. Adam learning rates: weights 0.001, eta 1.0; batch size 2048; maximum epochs 20; validation patience 5; CPU threads 1.
-
-| Training cost | Epochs | Best validation CVaR | Restored eta |
-| --- | --- | --- | --- |
-| 0.0 | 20 | 402.849 | 393.25513 |
-| 0.001 | 20 | 422.00179 | 411.99515 |
-| 0.005 | 20 | 525.2261 | 515.07263 |
-
-Policies train on the daily grid. The 5/21-day results evaluate those same policies at fewer decision times; they are not separately optimized frequency-specific networks. Restored models minimize validation CVaR among observed epochs; convergence to the global CVaR optimum is not established.
-
-### All held-out frequency/cost benchmarks
-
-| Days | Cost | Policy | CVaR95 | Mean P&L | P&L variance | Mean cost | Turnover (units) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 0 | BS | 346.7973 | -301.19415 | 565.81746 | 0 | 5.5961944 |
-| 1 | 0 | Neural | 402.12687 | -299.42217 | 14703.596 | 0 | 6.4519798 |
-| 1 | 0 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 1 | 0.001 | BS | 375.49166 | -323.39668 | 650.53601 | 22.202533 | 5.5961944 |
-| 1 | 0.001 | Neural | 421.32619 | -324.72748 | 7058.6419 | 23.568522 | 5.8893197 |
-| 1 | 0.001 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 1 | 0.005 | BS | 509.48447 | -412.20682 | 2118.0748 | 111.01267 | 5.5961944 |
-| 1 | 0.005 | Neural | 524.87472 | -404.18682 | 9456.3986 | 104.35372 | 5.1440906 |
-| 1 | 0.005 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 5 | 0 | BS | 387.91154 | -300.66865 | 1574.3012 | 0 | 2.8261092 |
-| 5 | 0 | Neural | 437.19559 | -299.25037 | 15269.47 | 0 | 3.1954183 |
-| 5 | 0 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 5 | 0.001 | BS | 402.68967 | -311.88286 | 1616.6152 | 11.2142 | 2.8261092 |
-| 5 | 0.001 | Neural | 440.08242 | -312.66623 | 7877.2423 | 11.725376 | 2.9314974 |
-| 5 | 0.001 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 5 | 0.005 | BS | 465.7312 | -356.73966 | 2012.1613 | 56.071002 | 2.8261092 |
-| 5 | 0.005 | Neural | 502.18964 | -352.8236 | 10730.237 | 53.142765 | 2.6264402 |
-| 5 | 0.005 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 21 | 0 | BS | 473.55041 | -300.75766 | 5600.503 | 0 | 1.6070304 |
-| 21 | 0 | Neural | 525.3505 | -299.46951 | 17576.002 | 0 | 1.7625975 |
-| 21 | 0 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 21 | 0.001 | BS | 481.74766 | -307.13436 | 5662.9586 | 6.3766981 | 1.6070304 |
-| 21 | 0.001 | Neural | 511.89303 | -307.66795 | 10958.943 | 6.5153507 | 1.6306682 |
-| 21 | 0.001 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-| 21 | 0.005 | BS | 514.93045 | -332.64115 | 5951.2701 | 31.883491 | 1.6070304 |
-| 21 | 0.005 | Neural | 545.03467 | -330.34811 | 13924.078 | 30.575493 | 1.5192124 |
-| 21 | 0.005 | Zero | 1908.7772 | -336.24283 | 273370.05 | 0 | 0 |
-
-### Paired bootstrap uncertainty
-
-| Combination | Observed neural minus BS CVaR | 95% lower | 95% upper |
-| --- | --- | --- | --- |
-| f1_k0.0 | 55.32957 | 54.232812 | 56.438022 |
-| f1_k0.001 | 45.834537 | 44.251592 | 47.344723 |
-| f1_k0.005 | 15.390245 | 12.981025 | 17.429697 |
-| f21_k0.0 | 51.800092 | 47.029582 | 57.043398 |
-| f21_k0.001 | 30.145367 | 25.613589 | 33.87183 |
-| f21_k0.005 | 30.104227 | 25.420468 | 35.072887 |
-| f5_k0.0 | 49.284053 | 46.62826 | 51.768726 |
-| f5_k0.001 | 37.392757 | 34.818548 | 40.181876 |
-| f5_k0.005 | 36.458432 | 32.939597 | 39.483282 |
-
-Negative differences favor neural hedging; intervals crossing zero are inconclusive. These are marginal paired-path bootstrap intervals conditional on each fitted model, without multiplicity adjustment or independent retraining. No general outperformance claim follows from one fitted network per cost.
-
-Recorded approach wall times: A 61.236s, B 426.358s. Source figures: `results/approach1/if_main/{convergence,greeks,profiling}.html` and `results/approach2/if_main/{training,comparison,loss_histogram}.html`.
-
-<!-- GENERATED_RESULTS_END -->
-
-## 9. Reproducibility and limitations
-
-See the ten-line README for frozen installation and offline execution. The source
-data snapshots are committed; regenerable results are ignored. Full reproduction
-must execute training rather than merely load checkpoints. The live session export
-must be refreshed after the final response. Submission tagging remains pending.
-Exact post-session export and submission steps are in `FINALIZE.md`.
-The inherited `submission` tag points to old commit `0a27070` and has deliberately
-not been moved; it is not evidence of acceptance of this independent rebuild.
-
-Full clean-clone reproduction executed from commit
-`4c6c8aff36aa8652be7214b9eda49b5c943dbf36`, with a clean source tree, a new virtual
-environment and `uv sync --frozen --offline`. The Python/uv package cache was already
-populated inside the original repository; this is not a claim of cold-machine
-offline package installation. No live market-data retrieval was required.
-All eight pipeline stages returned zero, including full neural retraining (about
-427.5 seconds for the B process), independent held-out replay and comparison output.
-Evidence is in `results/clean_clone/20261104T090738342929/evidence.json` and the clone's
-timestamped `results/reproduction/` manifest. Across original and reproduced runs,
-325 pricing numerical fields and 631 hedging/history numerical fields agreed within
-the explicitly checked tolerances; timing fields were not treated as deterministic.
-The numerical source files and lockfile hashes were identical. The reproduced B
-artifacts were promoted to the canonical `results/approach2/if_main/` location after
-archiving the earlier exploratory full run. `results/reproduction_comparison.json`
-records these comparisons. Later local-pytest configuration/report edits do not
-change those numerical source files or dependencies.
-
-An earlier all-tests run encountered 17 failures from unexpected untracked tests
-using a different API. With explicit user authorization, those files were preserved
-under `.cache/unattributed-tests/` without reuse; the current independent suite then
-passed all 31 tests. Earlier direct pytest runs did not explicitly set a local
-temporary base directory; their write-locality compliance is therefore not verified.
-The configuration now enforces `.cache/pytest-tmp`. This historical uncertainty is
-retained rather than represented as a clean compliance pass.
-
-Limitations include continuous-contract roll contamination, constant volatility,
-the spot-versus-futures convention, simplified cash-flow timing, model-implied rather
-than physical loss tails, discrete barrier monitoring, and single-seed training
-variability unless additional full independent fits are actually executed.
-In this executed 20-epoch experiment, all nine matched neural-minus-BS CVaR point
-differences are positive, and all nine marginal paired-bootstrap intervals exclude
-zero on the positive side. Thus these particular trained policies underperform the
-BS benchmark on held-out CVaR. This finding is conditional on the model, architecture,
-training budget and single set of fitted networks; it is not a general impossibility
-result for deep hedging. All policies reached the 20-epoch budget, so the experiment
-does not establish optimization convergence.
-
-## 10. Conclusion
-
-Under the assignment-prescribed GBM, the European Monte Carlo price passed the
-Black–Scholes validation with a z-score of 0.627151. The discrete geometric-Asian
-control variate reduced the Asian estimator's variance by approximately 1563.94
-times at matched production path budgets, with additional pilot cost reported
-separately. These results support the numerical implementation within the stated
-model and monitoring conventions.
-
-Across all nine matched cost–frequency combinations, the three fitted neural
-policies had higher held-out CVaR than BS delta hedging; all corresponding marginal
-paired-bootstrap intervals for neural-minus-BS CVaR were positive. Less frequent
-rebalancing reduced turnover and, at positive cost rates, transaction costs, but
-did not uniformly reduce tail loss. For BS hedging, daily rebalancing gave the lowest
-observed CVaR at zero and 10 bp costs, whereas 5-day rebalancing gave the lowest at
-50 bp; moving further
-to 21 days increased CVaR at every cost level relative to 5 days.
-
-These findings are conditional on the IF0 calibration, possible continuous-contract
-roll effects, the prescribed spot-style GBM and accounting conventions, and the
-20-epoch training budget. There is one fitted network per cost, trained on the daily
-grid; the coarser-grid results do not represent frequency-specific retraining.
-The paired-bootstrap intervals describe test-path uncertainty conditional on those
-fits, not training variability or general superiority of either strategy.
-
-## 11. Statement of work
-
-OpenAI established the shared mathematical conventions, independently retrieved and
-verified data, constructed quadrature references and infrastructure, and drafts this
-report. DeepSeek implemented the numerical engines, estimator experiments and initial
-neural training code, then repaired confirmed pricing defects. OpenAI integrated the
-hedging precision/checkpoint repairs and executed full-size training, independent replay
-and clean-clone reproduction. Kimi performed independent read-only reviews of the data
-and integrated algorithms. Actual provider identifiers and
-child session IDs are recorded in RESEARCH_PROTOCOL.md and authentic session exports.
-The student group must review the assumptions, mathematical decisions, empirical
-verification and final English report; this draft is not a record of group approval.
+The metrics and HTML figures under `results/` are reproducible outputs. If the project is submitted without generated artifacts, they must be regenerated using the repository instructions before inspecting those files.
